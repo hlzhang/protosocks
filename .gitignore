@@ -1,5 +1,10 @@
 /target
 Cargo.lock
 
+tarpaulin-report.*
+
 /.idea
+
 *.bak
+
+
