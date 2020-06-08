@@ -1,0 +1,27 @@
+[package]
+name = "protosocks"
+version = "0.1.0"
+authors = ["hlzhang <hlzhang@users.noreply.github.com>"]
+edition = "2018"
+
+[dependencies]
+bytes = "0.5.3"
+byteorder = "1.3"
+log = "0.4"
+num-traits = "0.2"
+num-derive = "0.3"
+serde = "1.0.15"
+serde_derive = "1.0.15"
+smolsocket = { version = "0.3", default-features = false }
+smoltcp = { version = "0.6.0", default-features = false }
+snafu = "0.4.1"
+#tokio-util = { version = "0.3", features = ["codec"] }
+
+[features]
+std = ["smolsocket/std", "smoltcp/std"]
+"proto-ipv4" = ["smolsocket/proto-ipv4", "smoltcp/proto-ipv4"]
+"proto-ipv6" = ["smolsocket/proto-ipv6", "smoltcp/proto-ipv4"]
+default = [
+  "std",
+  "proto-ipv4", "proto-ipv6"
+]
