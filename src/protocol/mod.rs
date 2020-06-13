@@ -9,12 +9,13 @@ use snafu::Snafu;
 pub use addr::{Addr, HasAddr};
 pub use cmd_rep::{CmdRepr, Packet, RepRepr};
 pub use method_selection::{
-    ReplyPacket as MethodsPacket, ReplyRepr as MethodsRepr, RequestPacket as MethodPacket,
-    RequestRepr as MethodRepr,
+    ReplyPacket as MethodPacket, ReplyRepr as MethodRepr,
+    RequestPacket as MethodsPacket, RequestRepr as MethodsRepr,
 };
 pub use rfc1929::{
     ReplyPacket as AuthReplyPacket, ReplyRepr as AuthReplyRepr, RequestPacket as UserPassPacket,
     RequestRepr as UserPassRepr,
+    Status
 };
 pub use udp::{Packet as UdpPacket, Repr as UdpRepr};
 
@@ -24,7 +25,7 @@ mod method_selection;
 mod rfc1929;
 mod udp;
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Error {
     Malformed,
     Truncated,
@@ -332,10 +333,10 @@ pub(crate) trait Encodable {
     fn try_encode(&self, dst: &mut BytesMut) -> Result<()>;
 }
 
-pub(crate) trait Encoder<Item> {
+pub trait Encoder<Item> {
     fn encode(item: &Item, dst: &mut BytesMut) -> Result<()>;
 }
 
-pub(crate) trait Decoder<Item> {
+pub trait Decoder<Item> {
     fn decode(src: &mut BytesMut) -> Result<Option<Item>>;
 }

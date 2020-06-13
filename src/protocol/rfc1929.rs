@@ -429,8 +429,7 @@ impl<T: AsRef<[u8]>> AsRef<[u8]> for ReplyPacket<T> {
 /// A high-level representation of a RFC1929 Reply packet.
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct ReplyRepr {
-    ver: Ver,
-    status: Status,
+    pub status: Status,
 }
 
 impl ReplyRepr {
@@ -443,7 +442,6 @@ impl ReplyRepr {
         packet.check_len()?;
 
         Ok(ReplyRepr {
-            ver: Ver::X01,
             status: Status::try_from(packet.status())?,
         })
     }
@@ -684,7 +682,6 @@ mod tests {
     #[test]
     fn test_reply_repr_emit_parse_failure() {
         let repr = ReplyRepr {
-            ver: Ver::X01,
             status: Status::Failure,
         };
         assert_eq!(repr.buffer_len(), 2);
@@ -704,7 +701,6 @@ mod tests {
     #[test]
     fn test_reply_repr_emit_parse_success() {
         let repr = ReplyRepr {
-            ver: Ver::X01,
             status: Status::Success,
         };
         assert_eq!(repr.buffer_len(), 2);

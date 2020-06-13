@@ -315,8 +315,8 @@ impl<T: AsRef<[u8]>> AsRef<[u8]> for ReplyPacket<T> {
 /// A high-level representation of a Method Selection Reply packet.
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct ReplyRepr {
-    ver: Ver,
-    method: Method,
+    pub ver: Ver,
+    pub method: Method,
 }
 
 impl ReplyRepr {
