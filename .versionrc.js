@@ -11,7 +11,12 @@
 // npx standard-version --dry-run
 module.exports = () => {
     return {
-        "bumpFiles": [],
+        "bumpFiles": [
+            {
+                "filename": "ver",
+                "type": "plain-text"
+            }
+        ],
         "packageFiles": [
             {
                 "filename": "ver",
