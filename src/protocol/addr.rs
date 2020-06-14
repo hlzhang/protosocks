@@ -130,6 +130,10 @@ impl<T: AsRef<[u8]>> HasAddr<T> {
         }
         Ok(())
     }
+
+    pub fn take_buffer(self) -> T {
+        self.buffer
+    }
 }
 
 impl<'a, T: AsRef<[u8]> + ?Sized> HasAddr<&'a T> {

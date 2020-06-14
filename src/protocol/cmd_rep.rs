@@ -198,6 +198,10 @@ impl<T: AsRef<[u8]>> Packet<T> {
     pub fn port(&self) -> u16 {
         self.0.port()
     }
+
+    pub fn take_buffer(self) -> T {
+        self.0.take_buffer()
+    }
 }
 
 impl<'a, T: AsRef<[u8]> + ?Sized> Packet<&'a T> {

@@ -72,6 +72,10 @@ impl<T: AsRef<[u8]>> RequestPacket<T> {
         let methods = &data[field::methods(self.nmethods())];
         Method::try_from_slice(methods)
     }
+
+    pub fn take_buffer(self) -> T {
+        self.buffer
+    }
 }
 
 impl<'a, T: AsRef<[u8]> + ?Sized> RequestPacket<&'a T> {
@@ -262,6 +266,10 @@ impl<T: AsRef<[u8]>> ReplyPacket<T> {
     pub fn method(&self) -> u8 {
         let data = self.buffer.as_ref();
         data[field::METHOD]
+    }
+
+    pub fn take_buffer(self) -> T {
+        self.buffer
     }
 }
 

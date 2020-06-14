@@ -27,7 +27,7 @@ cargo fmt --all -- --check
 
 Generate test coverage report (cargo-tarpaulin)
 ```shell script
-docker run --rm -it --security-opt seccomp=unconfined -v "${PWD}:/volume" xd009642/tarpaulin sh -c "cargo tarpaulin --out Html"
+docker run --rm -it --security-opt seccomp=unconfined -v "${PWD}:/volume" xd009642/tarpaulin sh -c "cargo tarpaulin --ignore-tests --out Html"
 #docker run --rm -it --security-opt seccomp=unconfined -v "${PWD}:/volume" xd009642/tarpaulin sh -c "cargo tarpaulin --run-types Doctests --all"
 #docker run --rm -it --security-opt seccomp=unconfined -v "${PWD}:/volume" xd009642/tarpaulin sh -c "cargo tarpaulin --run-types Tests --all"
 #docker run --rm -it --security-opt seccomp=unconfined -v "${PWD}:/volume" xd009642/tarpaulin sh -c "cargo tarpaulin --run-types Doctests Tests --all"

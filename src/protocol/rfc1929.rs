@@ -168,6 +168,10 @@ impl<T: AsRef<[u8]>> RequestPacket<T> {
         let data = self.buffer.as_ref();
         data[self.pos_plen()]
     }
+
+    pub fn take_buffer(self) -> T {
+        self.buffer
+    }
 }
 
 impl<'a, T: AsRef<[u8]> + ?Sized> RequestPacket<&'a T> {
@@ -388,6 +392,10 @@ impl<T: AsRef<[u8]>> ReplyPacket<T> {
     pub fn status(&self) -> u8 {
         let data = self.buffer.as_ref();
         data[field::STATUS]
+    }
+
+    pub fn take_buffer(self) -> T {
+        self.buffer
     }
 }
 
@@ -688,13 +696,12 @@ mod tests {
         let mut bytes_mut = BytesMut::new();
         ReplyRepr::encode(&repr, &mut bytes_mut).expect("should encode");
         let pkt = ReplyPacket::new_checked(bytes_mut.as_ref()).expect("new packet should success");
-        assert_eq!(pkt.version(), repr.ver as u8);
+        assert_eq!(pkt.version(), Ver::X01 as u8);
         assert_eq!(pkt.status(), repr.status as u8);
 
         let decoded = ReplyRepr::decode(&mut bytes_mut)
             .expect("decode should success")
             .expect("should present");
-        assert_eq!(decoded.ver, Ver::X01);
         assert_eq!(decoded.status, Status::Failure);
     }
 
@@ -708,15 +715,14 @@ mod tests {
         ReplyRepr::encode(&repr, &mut bytes_mut).expect("should encode");
         let pkt = ReplyPacket::new_checked(bytes_mut.as_ref()).expect("new packet should success");
         assert_eq!(pkt.total_len(), 2);
-        assert_eq!(pkt.version(), repr.ver as u8);
+        assert_eq!(pkt.version(), Ver::X01 as u8);
         assert_eq!(pkt.status(), repr.status as u8);
-        assert_eq!(pkt.as_ref()[0], repr.ver as u8);
+        assert_eq!(pkt.as_ref()[0], Ver::X01 as u8);
         assert_eq!(pkt.as_ref()[1], repr.status as u8);
 
         let decoded = ReplyRepr::decode(&mut bytes_mut)
             .expect("decode should success")
             .expect("should present");
-        assert_eq!(decoded.ver, Ver::X01);
         assert_eq!(decoded.status, Status::Success);
     }
 
