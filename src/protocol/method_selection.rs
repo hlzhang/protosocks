@@ -154,12 +154,13 @@ pub struct RequestRepr {
 impl RequestRepr {
     /// Parse a packet and return a high-level representation.
     pub fn parse<T: AsRef<[u8]> + ?Sized>(packet: &RequestPacket<&T>) -> Result<RequestRepr> {
+        // Length of methods must equals to nmethods
+        packet.check_len()?;
+
         // Version 5 is expected.
         if packet.version() != Ver::SOCKS5 as u8 {
             return Err(Error::Malformed);
         }
-        // Length of methods must equals to nmethods
-        packet.check_len()?;
         if packet.methods().len() > packet.nmethods() as usize {
             return Err(Error::Malformed);
         }
@@ -330,11 +331,12 @@ pub struct ReplyRepr {
 impl ReplyRepr {
     /// Parse a packet and return a high-level representation.
     pub fn parse<T: AsRef<[u8]> + ?Sized>(packet: &ReplyPacket<&T>) -> Result<ReplyRepr> {
+        packet.check_len()?;
+
         // Version 5 is expected.
         if packet.version() != Ver::SOCKS5 as u8 {
             return Err(Error::Malformed);
         }
-        packet.check_len()?;
 
         Ok(ReplyRepr {
             ver: Ver::SOCKS5,

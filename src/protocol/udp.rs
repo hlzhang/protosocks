@@ -235,6 +235,8 @@ pub struct Repr {
 impl Repr {
     /// Parse a packet and return a high-level representation.
     pub fn parse<T: AsRef<[u8]> + ?Sized>(packet: &Packet<&T>) -> Result<Repr> {
+        packet.check_header_len()?;
+
         // Version 5 is expected.
         if packet.rsv() != 0 as u16 {
             return Err(Error::Malformed);
@@ -243,7 +245,6 @@ impl Repr {
         if frag > 127 {
             return Err(Error::Malformed);
         }
-        packet.check_header_len()?;
 
         Ok(Repr {
             frag,

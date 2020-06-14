@@ -284,11 +284,12 @@ pub struct RequestRepr {
 impl RequestRepr {
     /// Parse a packet and return a high-level representation.
     pub fn parse<T: AsRef<[u8]> + ?Sized>(packet: &RequestPacket<&T>) -> Result<RequestRepr> {
+        packet.check_len()?;
+
         // Version 5 is expected.
         if packet.version() != Ver::X01 as u8 {
             return Err(Error::Malformed);
         }
-        packet.check_len()?;
 
         let uname =
             String::from_utf8(packet.uname().to_vec()).map_err(|_utf8err| Error::Malformed)?;
@@ -443,11 +444,12 @@ pub struct ReplyRepr {
 impl ReplyRepr {
     /// Parse a packet and return a high-level representation.
     pub fn parse<T: AsRef<[u8]> + ?Sized>(packet: &ReplyPacket<&T>) -> Result<ReplyRepr> {
+        packet.check_len()?;
+
         // Version 5 is expected.
         if packet.version() != Ver::X01 as u8 {
             return Err(Error::Malformed);
         }
-        packet.check_len()?;
 
         Ok(ReplyRepr {
             status: Status::try_from(packet.status())?,
@@ -611,10 +613,22 @@ mod tests {
         assert_eq!(empty.check_len(), Err(Error::Malformed));
         assert_eq!(RequestRepr::decode(&mut empty_bytes), Err(Error::Malformed));
 
-        let mut malformed_bytes = BytesMut::new();
-        malformed_bytes.extend(vec![0x00 as u8; 2]);
-        let mut malformed = RequestPacket::new_unchecked(&mut malformed_bytes);
+        let mut truncated_bytes = BytesMut::new();
+        truncated_bytes.extend(vec![0x00 as u8; 2]);
+        let mut truncated = RequestPacket::new_unchecked(&mut truncated_bytes);
+        truncated.set_version(0x00);
+        assert_eq!(
+            RequestRepr::decode(&mut truncated_bytes),
+            Ok(None)
+        );
+
+        let mut malformed = test_request(&RequestRepr {
+            uname: "".to_string(),
+            passwd: "".to_string(),
+        });
         malformed.set_version(0x00);
+        let mut malformed_bytes = BytesMut::new();
+        malformed_bytes.extend(malformed.take_buffer());
         assert_eq!(
             RequestRepr::decode(&mut malformed_bytes),
             Err(Error::Malformed)

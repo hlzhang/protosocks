@@ -293,6 +293,8 @@ pub struct CmdRepr {
 impl CmdRepr {
     /// Parse a packet and return a high-level representation.
     pub fn parse<T: AsRef<[u8]> + ?Sized>(packet: &Packet<&T>) -> Result<CmdRepr> {
+        packet.check_len()?;
+
         // Version 5 is expected.
         if packet.version() != Ver::SOCKS5 as u8 {
             return Err(Error::Malformed);
@@ -300,7 +302,6 @@ impl CmdRepr {
         if packet.as_ref()[field::RSV] != 0 {
             return Err(Error::Malformed);
         }
-        packet.check_len()?;
 
         Ok(CmdRepr {
             ver: Ver::SOCKS5,
@@ -365,6 +366,8 @@ pub struct RepRepr {
 impl RepRepr {
     /// Parse a packet and return a high-level representation.
     pub fn parse<T: AsRef<[u8]> + ?Sized>(packet: &Packet<&T>) -> Result<RepRepr> {
+        packet.check_len()?;
+
         // Version 5 is expected.
         if packet.version() != Ver::SOCKS5 as u8 {
             return Err(Error::Malformed);
@@ -372,7 +375,6 @@ impl RepRepr {
         if packet.as_ref()[field::RSV] != 0 {
             return Err(Error::Malformed);
         }
-        packet.check_len()?;
 
         Ok(RepRepr {
             ver: Ver::SOCKS5,
