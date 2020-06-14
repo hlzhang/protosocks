@@ -3,7 +3,7 @@ use core::convert::TryFrom;
 use bytes::{Buf, BytesMut};
 
 use super::addr::field_port;
-use super::{field, Addr, Cmd, Decoder, Encodable, Encoder, Error, HasAddr, Rep, Result, Ver};
+use super::{field, SocksAddr, Cmd, Decoder, Encodable, Encoder, Error, HasAddr, Rep, Result, Ver};
 
 // Requests
 //
@@ -287,7 +287,7 @@ impl<T: AsRef<[u8]>> AsRef<[u8]> for Packet<T> {
 pub struct CmdRepr {
     pub ver: Ver,
     pub cmd: Cmd,
-    pub addr: Addr,
+    pub addr: SocksAddr,
 }
 
 impl CmdRepr {
@@ -306,7 +306,7 @@ impl CmdRepr {
         Ok(CmdRepr {
             ver: Ver::SOCKS5,
             cmd: Cmd::try_from(packet.cmd_or_rep())?,
-            addr: Addr::try_from(packet.socks_addr())?,
+            addr: SocksAddr::try_from(packet.socks_addr())?,
         })
     }
 
@@ -360,7 +360,7 @@ impl Encoder<CmdRepr> for CmdRepr {
 pub struct RepRepr {
     pub ver: Ver,
     pub rep: Rep,
-    pub addr: Addr,
+    pub addr: SocksAddr,
 }
 
 impl RepRepr {
@@ -379,7 +379,7 @@ impl RepRepr {
         Ok(RepRepr {
             ver: Ver::SOCKS5,
             rep: Rep::try_from(packet.cmd_or_rep())?,
-            addr: Addr::try_from(packet.socks_addr())?,
+            addr: SocksAddr::try_from(packet.socks_addr())?,
         })
     }
 
@@ -478,7 +478,7 @@ mod tests {
     #[test]
     fn test_cmd_connect_ip4() {
         let socket_addr = SocketAddr::new_ip4_port(127, 0, 0, 1, 80);
-        let socks_addr = Addr::SocketAddr(socket_addr);
+        let socks_addr = SocksAddr::SocketAddr(socket_addr);
         let repr = CmdRepr {
             ver: Ver::SOCKS5,
             cmd: Cmd::Connect,
@@ -511,7 +511,7 @@ mod tests {
         let parsed = CmdRepr::parse(&pkt_to_parse).expect("should parse");
         assert_eq!(parsed, repr);
         assert_eq!(parsed.addr.atyp(), Atyp::V4);
-        if let Addr::SocketAddr(SocketAddr::V4(socket_addr)) = parsed.addr {
+        if let SocksAddr::SocketAddr(SocketAddr::V4(socket_addr)) = parsed.addr {
             assert!(socket_addr.addr.is_loopback());
         }
 
@@ -525,7 +525,7 @@ mod tests {
     #[test]
     fn test_cmd_connect_ip6() {
         let socket_addr = SocketAddr::new_ip6_port(0, 0, 0, 0, 0, 0, 0, 1, 80);
-        let socks_addr = Addr::SocketAddr(socket_addr);
+        let socks_addr = SocksAddr::SocketAddr(socket_addr);
         let repr = CmdRepr {
             ver: Ver::SOCKS5,
             cmd: Cmd::Connect,
@@ -561,7 +561,7 @@ mod tests {
         let parsed = CmdRepr::parse(&pkt_to_parse).expect("should parse");
         assert_eq!(parsed, repr);
         assert_eq!(parsed.addr.atyp(), Atyp::V6);
-        if let Addr::SocketAddr(SocketAddr::V6(socket_addr)) = parsed.addr {
+        if let SocksAddr::SocketAddr(SocketAddr::V6(socket_addr)) = parsed.addr {
             assert!(socket_addr.addr.is_loopback());
         }
 
@@ -573,7 +573,7 @@ mod tests {
 
     #[test]
     fn test_cmd_connect_domain() {
-        let socks_addr = Addr::DomainPort("google.com".to_string(), 443);
+        let socks_addr = SocksAddr::DomainPort("google.com".to_string(), 443);
         let repr = CmdRepr {
             ver: Ver::SOCKS5,
             cmd: Cmd::Connect,
@@ -603,7 +603,7 @@ mod tests {
         let parsed = CmdRepr::parse(&pkt_to_parse).expect("should parse");
         assert_eq!(parsed, repr);
         assert_eq!(parsed.addr.atyp(), Atyp::Domain);
-        if let Addr::DomainPort(domain, port) = parsed.addr {
+        if let SocksAddr::DomainPort(domain, port) = parsed.addr {
             assert_eq!(domain, "google.com".to_string());
             assert_eq!(port, 443);
         }
@@ -650,7 +650,7 @@ mod tests {
     #[test]
     fn test_rep_success_ip4() {
         let socket_addr = SocketAddr::new_ip4_port(127, 0, 0, 1, 80);
-        let socks_addr = Addr::SocketAddr(socket_addr);
+        let socks_addr = SocksAddr::SocketAddr(socket_addr);
         let repr = RepRepr {
             ver: Ver::SOCKS5,
             rep: Rep::Success,
@@ -683,7 +683,7 @@ mod tests {
         let parsed = RepRepr::parse(&pkt_to_parse).expect("should parse");
         assert_eq!(parsed, repr);
         assert_eq!(parsed.addr.atyp(), Atyp::V4);
-        if let Addr::SocketAddr(SocketAddr::V4(socket_addr)) = parsed.addr {
+        if let SocksAddr::SocketAddr(SocketAddr::V4(socket_addr)) = parsed.addr {
             assert!(socket_addr.addr.is_loopback());
         }
 
@@ -697,7 +697,7 @@ mod tests {
     #[test]
     fn test_rep_success_ip6() {
         let socket_addr = SocketAddr::new_ip6_port(0, 0, 0, 0, 0, 0, 0, 1, 80);
-        let socks_addr = Addr::SocketAddr(socket_addr);
+        let socks_addr = SocksAddr::SocketAddr(socket_addr);
         let repr = RepRepr {
             ver: Ver::SOCKS5,
             rep: Rep::Success,
@@ -733,7 +733,7 @@ mod tests {
         let parsed = RepRepr::parse(&pkt_to_parse).expect("should parse");
         assert_eq!(parsed, repr);
         assert_eq!(parsed.addr.atyp(), Atyp::V6);
-        if let Addr::SocketAddr(SocketAddr::V6(socket_addr)) = parsed.addr {
+        if let SocksAddr::SocketAddr(SocketAddr::V6(socket_addr)) = parsed.addr {
             assert!(socket_addr.addr.is_loopback());
         }
 
@@ -745,7 +745,7 @@ mod tests {
 
     #[test]
     fn test_rep_success_domain() {
-        let socks_addr = Addr::DomainPort("google.com".to_string(), 443);
+        let socks_addr = SocksAddr::DomainPort("google.com".to_string(), 443);
         let repr = RepRepr {
             ver: Ver::SOCKS5,
             rep: Rep::Success,
@@ -775,7 +775,7 @@ mod tests {
         let parsed = RepRepr::parse(&pkt_to_parse).expect("should parse");
         assert_eq!(parsed, repr);
         assert_eq!(parsed.addr.atyp(), Atyp::Domain);
-        if let Addr::DomainPort(domain, port) = parsed.addr {
+        if let SocksAddr::DomainPort(domain, port) = parsed.addr {
             assert_eq!(domain, "google.com".to_string());
             assert_eq!(port, 443);
         }

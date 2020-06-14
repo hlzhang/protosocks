@@ -4,15 +4,15 @@ extern crate log;
 extern crate serde_derive;
 
 pub use protocol::{
-    Addr, Atyp,
+    SocksAddr, Atyp,
     AuthReplyPacket, AuthReplyRepr,
-    Cmd, CmdRepr,
+    Cmd, CmdPacket, CmdRepr,
     Decoder as ProtocolDecoder,
     Encoder as ProtocolEncoder,
     HasAddr,
     MethodPacket, MethodRepr,
-    MethodsPacket, MethodsRepr, Packet,
-    Rep, RepRepr,
+    MethodsPacket, MethodsRepr,
+    Rep, RepPacket, RepRepr,
     Status,
     UdpPacket, UdpRepr,
     UserPassPacket, UserPassRepr,

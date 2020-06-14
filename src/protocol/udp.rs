@@ -5,7 +5,7 @@ use smolsocket::port_from_bytes;
 
 use crate::field::Field;
 
-use super::{addr::field_port, field, Addr, Decoder, Encodable, Encoder, Error, HasAddr, Result};
+use super::{addr::field_port, field, SocksAddr, Decoder, Encodable, Encoder, Error, HasAddr, Result};
 
 //
 // +----+------+------+----------+----------+----------+
@@ -228,7 +228,7 @@ impl<T: AsRef<[u8]>> AsRef<[u8]> for Packet<T> {
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Repr {
     pub frag: u8,
-    pub addr: Addr,
+    pub addr: SocksAddr,
     pub payload_len: usize,
 }
 
@@ -248,7 +248,7 @@ impl Repr {
 
         Ok(Repr {
             frag,
-            addr: Addr::try_from(packet.socks_addr())?,
+            addr: SocksAddr::try_from(packet.socks_addr())?,
             payload_len: packet.as_ref().len() - packet.header_len(),
         })
     }
@@ -346,7 +346,7 @@ mod tests {
     #[test]
     fn test_data_len_0() {
         let socket_addr = SocketAddr::new_ip4_port(127, 0, 0, 1, 80);
-        let addr = Addr::SocketAddr(socket_addr);
+        let addr = SocksAddr::SocketAddr(socket_addr);
         let repr = Repr {
             frag: 0,
             addr: addr.clone(),
@@ -399,7 +399,7 @@ mod tests {
     #[test]
     fn test_data_len_1() {
         let socket_addr = SocketAddr::new_ip4_port(127, 0, 0, 1, 80);
-        let addr = Addr::SocketAddr(socket_addr);
+        let addr = SocksAddr::SocketAddr(socket_addr);
         let repr = Repr {
             frag: 0,
             addr: addr.clone(),

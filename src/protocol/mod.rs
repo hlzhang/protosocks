@@ -6,8 +6,11 @@ use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
 use snafu::Snafu;
 
-pub use addr::{Addr, HasAddr};
-pub use cmd_rep::{CmdRepr, Packet, RepRepr};
+pub use addr::{Addr as SocksAddr, HasAddr};
+pub use cmd_rep::{
+    CmdRepr, Packet as CmdPacket,
+    RepRepr, Packet as RepPacket
+};
 pub use method_selection::{
     ReplyPacket as MethodPacket, ReplyRepr as MethodRepr,
     RequestPacket as MethodsPacket, RequestRepr as MethodsRepr,
