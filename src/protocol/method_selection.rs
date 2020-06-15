@@ -147,7 +147,6 @@ impl<T: AsRef<[u8]>> AsRef<[u8]> for RequestPacket<T> {
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct RequestRepr {
     pub ver: Ver,
-    pub nmethods: u8,
     pub methods: Methods,
 }
 
@@ -170,14 +169,13 @@ impl RequestRepr {
 
         Ok(RequestRepr {
             ver: Ver::SOCKS5,
-            nmethods: packet.nmethods(),
             methods: packet.parse_methods()?,
         })
     }
 
     /// Return the length of that will be emitted from this high-level representation.
     pub fn buffer_len(&self) -> usize {
-        field::METHODS.start + self.nmethods as usize
+        field::METHODS.start + self.methods.len()
     }
 
     /// Emit a high-level representation into a packet.
@@ -397,14 +395,12 @@ mod tests {
     fn test_request_repr_buffer_len() {
         let user_pass = RequestRepr {
             ver: Ver::SOCKS5,
-            nmethods: 1,
             methods: vec![Method::UserPass],
         };
         assert_eq!(user_pass.buffer_len(), 3);
 
         let no_auth_user_pass = RequestRepr {
             ver: Ver::SOCKS5,
-            nmethods: 2,
             methods: vec![Method::NoAuth, Method::UserPass],
         };
         assert_eq!(no_auth_user_pass.buffer_len(), 4);
@@ -414,7 +410,6 @@ mod tests {
     fn test_request_repr_emit_parse_no_auth_user_pass() {
         let no_auth_user_pass = RequestRepr {
             ver: Ver::SOCKS5,
-            nmethods: 2,
             methods: vec![Method::NoAuth, Method::UserPass],
         };
         assert_eq!(no_auth_user_pass.buffer_len(), 4);
@@ -423,7 +418,7 @@ mod tests {
         let no_auth_user_pass_pkt =
             RequestPacket::new_checked(bytes_mut.as_ref()).expect("should success");
         assert_eq!(no_auth_user_pass_pkt.version(), no_auth_user_pass.ver as u8);
-        assert_eq!(no_auth_user_pass_pkt.nmethods(), no_auth_user_pass.nmethods);
+        assert_eq!(no_auth_user_pass_pkt.nmethods() as usize, no_auth_user_pass.methods.len());
         let parsed_no_auth_user_pass = Method::try_from_slice(no_auth_user_pass_pkt.methods())
             .expect("should be [NoAuth, UserPass]");
         assert_eq!(parsed_no_auth_user_pass.len(), 2);
@@ -434,7 +429,7 @@ mod tests {
             .expect("should success")
             .expect("should present");
         assert_eq!(decoded.ver, Ver::SOCKS5);
-        assert_eq!(decoded.nmethods, 2);
+        assert_eq!(decoded.methods.len(), 2);
         assert_eq!(decoded.methods[0], Method::NoAuth);
         assert_eq!(decoded.methods[1], Method::UserPass);
     }
@@ -443,7 +438,6 @@ mod tests {
     fn test_request_repr_emit_parse_user_pass() {
         let user_pass = RequestRepr {
             ver: Ver::SOCKS5,
-            nmethods: 1,
             methods: vec![Method::UserPass],
         };
         assert_eq!(user_pass.buffer_len(), 3);
@@ -451,7 +445,7 @@ mod tests {
         let mut user_pass_pkt = RequestPacket::new_unchecked(&mut vec);
         user_pass.emit(&mut user_pass_pkt);
         assert_eq!(user_pass_pkt.version(), user_pass.ver as u8);
-        assert_eq!(user_pass_pkt.nmethods(), user_pass.nmethods);
+        assert_eq!(user_pass_pkt.nmethods() as usize, user_pass.methods.len());
         let parsed_user_pass =
             Method::try_from_slice(user_pass_pkt.methods_mut()).expect("should be [UserPass]");
         assert_eq!(parsed_user_pass.len(), 1);
@@ -486,7 +480,6 @@ mod tests {
             RequestRepr::decode(&mut no_method_bytes),
             Ok(Some(RequestRepr {
                 ver: Ver::SOCKS5,
-                nmethods: 0,
                 methods: Methods::new(),
             }))
         );
