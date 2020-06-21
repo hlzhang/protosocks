@@ -309,9 +309,10 @@ impl TryFrom<&[u8]> for Addr {
                             &value[field_addr.start..field_port.end],
                         )?)),
                         Atyp::Domain => {
-                            let domain =
-                                String::from_utf8_lossy(&value[field_addr.start + 1..field_addr.end])
-                                    .to_string();
+                            let domain = String::from_utf8_lossy(
+                                &value[field_addr.start + 1..field_addr.end],
+                            )
+                            .to_string();
                             let port_bytes = &value[field_port];
                             let port = port_from_bytes(port_bytes[0], port_bytes[1]);
                             Ok(Addr::DomainPort(domain, port))
@@ -321,7 +322,7 @@ impl TryFrom<&[u8]> for Addr {
                     }
                 }
                 l if l < total_len => Err(Error::Truncated),
-                _ => Err(Error::Malformed)
+                _ => Err(Error::Malformed),
             }
         }
     }

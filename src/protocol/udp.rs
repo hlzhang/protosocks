@@ -5,7 +5,9 @@ use smolsocket::port_from_bytes;
 
 use crate::field::Field;
 
-use super::{addr::field_port, field, SocksAddr, Decoder, Encodable, Encoder, Error, HasAddr, Result};
+use super::{
+    addr::field_port, field, Decoder, Encodable, Encoder, Error, HasAddr, Result, SocksAddr,
+};
 
 //
 // +----+------+------+----------+----------+----------+
@@ -282,19 +284,18 @@ impl Decoder<Repr> for Repr {
 }
 
 impl Encodable for Repr {
-    fn try_encode(&self, dst: &mut BytesMut) -> Result<()> {
+    fn encode_into(&self, dst: &mut BytesMut) {
         if dst.len() < self.buffer_len() {
             dst.resize(self.buffer_len(), 0);
         }
         let mut pkt = Packet::new_unchecked(dst);
         self.emit(&mut pkt);
-        Ok(())
     }
 }
 
 impl Encoder<Repr> for Repr {
-    fn encode(item: &Repr, dst: &mut BytesMut) -> Result<()> {
-        item.try_encode(dst)
+    fn encode(item: &Repr, dst: &mut BytesMut) {
+        item.encode_into(dst);
     }
 }
 
@@ -390,7 +391,7 @@ mod tests {
         assert_eq!(parsed, repr);
 
         let mut bytes_mut = BytesMut::new();
-        assert!(Repr::encode(&repr, &mut bytes_mut).is_ok());
+        Repr::encode(&repr, &mut bytes_mut);
         let decoded = Repr::decode(&mut bytes_mut);
         assert_eq!(decoded, Ok(Some(repr)));
     }
@@ -443,7 +444,7 @@ mod tests {
         assert_eq!(parsed, repr);
 
         let mut bytes_mut = BytesMut::new();
-        assert!(Repr::encode(&repr, &mut bytes_mut).is_ok());
+        Repr::encode(&repr, &mut bytes_mut);
         let decoded = Repr::decode(&mut bytes_mut);
         assert_eq!(decoded, Ok(Some(repr)));
     }

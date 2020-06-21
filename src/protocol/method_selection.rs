@@ -2,7 +2,7 @@ use core::convert::TryFrom;
 
 use bytes::{Buf, BytesMut};
 
-use super::{Decoder, Encodable, Encoder, Error, field, Method, Result, ToU8Vec, Ver};
+use super::{field, Decoder, Encodable, Encoder, Error, Method, Result, ToU8Vec, Ver};
 
 pub type Methods = Vec<Method>;
 
@@ -200,19 +200,18 @@ impl Decoder<RequestRepr> for RequestRepr {
 }
 
 impl Encodable for RequestRepr {
-    fn try_encode(&self, dst: &mut BytesMut) -> Result<()> {
+    fn encode_into(&self, dst: &mut BytesMut) {
         if dst.len() < self.buffer_len() {
             dst.resize(self.buffer_len(), 0);
         }
         let mut pkt = RequestPacket::new_unchecked(dst);
         self.emit(&mut pkt);
-        Ok(())
     }
 }
 
 impl Encoder<RequestRepr> for RequestRepr {
-    fn encode(item: &RequestRepr, dst: &mut BytesMut) -> Result<()> {
-        item.try_encode(dst)
+    fn encode(item: &RequestRepr, dst: &mut BytesMut) {
+        item.encode_into(dst);
     }
 }
 
@@ -369,19 +368,18 @@ impl Decoder<ReplyRepr> for ReplyRepr {
 }
 
 impl Encodable for ReplyRepr {
-    fn try_encode(&self, dst: &mut BytesMut) -> Result<()> {
+    fn encode_into(&self, dst: &mut BytesMut) {
         if dst.len() < self.buffer_len() {
             dst.resize(self.buffer_len(), 0);
         }
         let mut pkt = ReplyPacket::new_unchecked(dst);
         self.emit(&mut pkt);
-        Ok(())
     }
 }
 
 impl Encoder<ReplyRepr> for ReplyRepr {
-    fn encode(item: &ReplyRepr, dst: &mut BytesMut) -> Result<()> {
-        item.try_encode(dst)
+    fn encode(item: &ReplyRepr, dst: &mut BytesMut) {
+        item.encode_into(dst);
     }
 }
 
@@ -414,11 +412,14 @@ mod tests {
         };
         assert_eq!(no_auth_user_pass.buffer_len(), 4);
         let mut bytes_mut = BytesMut::new();
-        RequestRepr::encode(&no_auth_user_pass, &mut bytes_mut).expect("should encode");
+        RequestRepr::encode(&no_auth_user_pass, &mut bytes_mut);
         let no_auth_user_pass_pkt =
             RequestPacket::new_checked(bytes_mut.as_ref()).expect("should success");
         assert_eq!(no_auth_user_pass_pkt.version(), no_auth_user_pass.ver as u8);
-        assert_eq!(no_auth_user_pass_pkt.nmethods() as usize, no_auth_user_pass.methods.len());
+        assert_eq!(
+            no_auth_user_pass_pkt.nmethods() as usize,
+            no_auth_user_pass.methods.len()
+        );
         let parsed_no_auth_user_pass = Method::try_from_slice(no_auth_user_pass_pkt.methods())
             .expect("should be [NoAuth, UserPass]");
         assert_eq!(parsed_no_auth_user_pass.len(), 2);
@@ -539,7 +540,7 @@ mod tests {
         };
         assert_eq!(no_auth.buffer_len(), 2);
         let mut bytes_mut = BytesMut::new();
-        ReplyRepr::encode(&no_auth, &mut bytes_mut).expect("should encode");
+        ReplyRepr::encode(&no_auth, &mut bytes_mut);
         let no_auth_pkt = ReplyPacket::new_checked(bytes_mut.as_ref()).expect("should success");
         assert_eq!(no_auth_pkt.version(), no_auth.ver as u8);
         assert_eq!(no_auth_pkt.method(), no_auth.method as u8);
@@ -567,7 +568,7 @@ mod tests {
         assert_eq!(pkt.method(), repr.method as u8);
 
         let mut bytes_mut = BytesMut::new();
-        ReplyRepr::encode(&repr, &mut bytes_mut).expect("should encode");
+        ReplyRepr::encode(&repr, &mut bytes_mut);
         let encoded_pkt = ReplyPacket::new_checked(bytes_mut.as_ref()).expect("should success");
         assert_eq!(encoded_pkt.version(), repr.ver as u8);
         assert_eq!(encoded_pkt.method(), repr.method as u8);

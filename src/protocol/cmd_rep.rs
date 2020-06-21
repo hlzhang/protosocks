@@ -3,7 +3,7 @@ use core::convert::TryFrom;
 use bytes::{Buf, BytesMut};
 
 use super::addr::field_port;
-use super::{field, SocksAddr, Cmd, Decoder, Encodable, Encoder, Error, HasAddr, Rep, Result, Ver};
+use super::{field, Cmd, Decoder, Encodable, Encoder, Error, HasAddr, Rep, Result, SocksAddr, Ver};
 
 // Requests
 //
@@ -339,19 +339,18 @@ impl Decoder<CmdRepr> for CmdRepr {
 }
 
 impl Encodable for CmdRepr {
-    fn try_encode(&self, dst: &mut BytesMut) -> Result<()> {
+    fn encode_into(&self, dst: &mut BytesMut) {
         if dst.len() < self.buffer_len() {
             dst.resize(self.buffer_len(), 0);
         }
         let mut pkt = Packet::new_unchecked(dst);
         self.emit(&mut pkt);
-        Ok(())
     }
 }
 
 impl Encoder<CmdRepr> for CmdRepr {
-    fn encode(item: &CmdRepr, dst: &mut BytesMut) -> Result<()> {
-        item.try_encode(dst)
+    fn encode(item: &CmdRepr, dst: &mut BytesMut) {
+        item.encode_into(dst);
     }
 }
 
@@ -412,19 +411,18 @@ impl Decoder<RepRepr> for RepRepr {
 }
 
 impl Encodable for RepRepr {
-    fn try_encode(&self, dst: &mut BytesMut) -> Result<()> {
+    fn encode_into(&self, dst: &mut BytesMut) {
         if dst.len() < self.buffer_len() {
             dst.resize(self.buffer_len(), 0);
         }
         let mut pkt = Packet::new_unchecked(dst);
         self.emit(&mut pkt);
-        Ok(())
     }
 }
 
 impl Encoder<RepRepr> for RepRepr {
-    fn encode(item: &RepRepr, dst: &mut BytesMut) -> Result<()> {
-        item.try_encode(dst)
+    fn encode(item: &RepRepr, dst: &mut BytesMut) {
+        item.encode_into(dst);
     }
 }
 
@@ -516,7 +514,7 @@ mod tests {
         }
 
         let mut bytes_mut = BytesMut::new();
-        assert!(CmdRepr::encode(&repr, &mut bytes_mut).is_ok());
+        CmdRepr::encode(&repr, &mut bytes_mut);
         let decoded = CmdRepr::decode(&mut bytes_mut);
         assert_eq!(decoded, Ok(Some(repr)));
     }
@@ -566,7 +564,7 @@ mod tests {
         }
 
         let mut bytes_mut = BytesMut::new();
-        assert!(CmdRepr::encode(&repr, &mut bytes_mut).is_ok());
+        CmdRepr::encode(&repr, &mut bytes_mut);
         let decoded = CmdRepr::decode(&mut bytes_mut);
         assert_eq!(decoded, Ok(Some(repr)));
     }
@@ -609,7 +607,7 @@ mod tests {
         }
 
         let mut bytes_mut = BytesMut::new();
-        assert!(CmdRepr::encode(&repr, &mut bytes_mut).is_ok());
+        CmdRepr::encode(&repr, &mut bytes_mut);
         let decoded = CmdRepr::decode(&mut bytes_mut);
         assert_eq!(decoded, Ok(Some(repr)));
     }
@@ -688,7 +686,7 @@ mod tests {
         }
 
         let mut bytes_mut = BytesMut::new();
-        assert!(RepRepr::encode(&repr, &mut bytes_mut).is_ok());
+        RepRepr::encode(&repr, &mut bytes_mut);
         let decoded = RepRepr::decode(&mut bytes_mut);
         assert_eq!(decoded, Ok(Some(repr)));
     }
@@ -738,7 +736,7 @@ mod tests {
         }
 
         let mut bytes_mut = BytesMut::new();
-        assert!(RepRepr::encode(&repr, &mut bytes_mut).is_ok());
+        RepRepr::encode(&repr, &mut bytes_mut);
         let decoded = RepRepr::decode(&mut bytes_mut);
         assert_eq!(decoded, Ok(Some(repr)));
     }
@@ -781,7 +779,7 @@ mod tests {
         }
 
         let mut bytes_mut = BytesMut::new();
-        assert!(RepRepr::encode(&repr, &mut bytes_mut).is_ok());
+        RepRepr::encode(&repr, &mut bytes_mut);
         let decoded = RepRepr::decode(&mut bytes_mut);
         assert_eq!(decoded, Ok(Some(repr)));
     }

@@ -8,7 +8,7 @@ use snafu::Snafu;
 
 use crate::field::Field;
 
-use super::{Decoder, Encodable, Encoder, Error, field, Result};
+use super::{field, Decoder, Encodable, Encoder, Error, Result};
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, FromPrimitive, Hash, PartialEq, Serialize, Snafu)]
 #[repr(u8)]
@@ -328,19 +328,18 @@ impl Decoder<RequestRepr> for RequestRepr {
 }
 
 impl Encodable for RequestRepr {
-    fn try_encode(&self, dst: &mut BytesMut) -> Result<()> {
+    fn encode_into(&self, dst: &mut BytesMut) {
         if dst.len() < self.buffer_len() {
             dst.resize(self.buffer_len(), 0);
         }
         let mut pkt = RequestPacket::new_unchecked(dst);
         self.emit(&mut pkt);
-        Ok(())
     }
 }
 
 impl Encoder<RequestRepr> for RequestRepr {
-    fn encode(item: &RequestRepr, dst: &mut BytesMut) -> Result<()> {
-        item.try_encode(dst)
+    fn encode(item: &RequestRepr, dst: &mut BytesMut) {
+        item.encode_into(dst);
     }
 }
 
@@ -483,19 +482,18 @@ impl Decoder<ReplyRepr> for ReplyRepr {
 }
 
 impl Encodable for ReplyRepr {
-    fn try_encode(&self, dst: &mut BytesMut) -> Result<()> {
+    fn encode_into(&self, dst: &mut BytesMut) {
         if dst.len() < self.buffer_len() {
             dst.resize(self.buffer_len(), 0);
         }
         let mut pkt = ReplyPacket::new_unchecked(dst);
         self.emit(&mut pkt);
-        Ok(())
     }
 }
 
 impl Encoder<ReplyRepr> for ReplyRepr {
-    fn encode(item: &ReplyRepr, dst: &mut BytesMut) -> Result<()> {
-        item.try_encode(dst)
+    fn encode(item: &ReplyRepr, dst: &mut BytesMut) {
+        item.encode_into(dst);
     }
 }
 
@@ -536,7 +534,7 @@ mod tests {
             repr.uname.as_bytes().len() + repr.passwd.as_bytes().len() + 3
         );
         let mut bytes_mut = BytesMut::new();
-        RequestRepr::encode(&repr, &mut bytes_mut).expect("should encode");
+        RequestRepr::encode(&repr, &mut bytes_mut);
         let pkt = RequestPacket::new_checked(bytes_mut.as_ref()).expect("should success");
         assert_eq!(pkt.ulen() as usize, repr.uname.as_bytes().len());
         assert_eq!(pkt.uname(), repr.uname.as_bytes());
@@ -617,10 +615,7 @@ mod tests {
         truncated_bytes.extend(vec![0x00 as u8; 2]);
         let mut truncated = RequestPacket::new_unchecked(&mut truncated_bytes);
         truncated.set_version(0x00);
-        assert_eq!(
-            RequestRepr::decode(&mut truncated_bytes),
-            Ok(None)
-        );
+        assert_eq!(RequestRepr::decode(&mut truncated_bytes), Ok(None));
 
         let mut malformed = test_request(&RequestRepr {
             uname: "".to_string(),
@@ -708,7 +703,7 @@ mod tests {
         };
         assert_eq!(repr.buffer_len(), 2);
         let mut bytes_mut = BytesMut::new();
-        ReplyRepr::encode(&repr, &mut bytes_mut).expect("should encode");
+        ReplyRepr::encode(&repr, &mut bytes_mut);
         let pkt = ReplyPacket::new_checked(bytes_mut.as_ref()).expect("new packet should success");
         assert_eq!(pkt.version(), Ver::X01 as u8);
         assert_eq!(pkt.status(), repr.status as u8);
@@ -726,7 +721,7 @@ mod tests {
         };
         assert_eq!(repr.buffer_len(), 2);
         let mut bytes_mut = BytesMut::new();
-        ReplyRepr::encode(&repr, &mut bytes_mut).expect("should encode");
+        ReplyRepr::encode(&repr, &mut bytes_mut);
         let pkt = ReplyPacket::new_checked(bytes_mut.as_ref()).expect("new packet should success");
         assert_eq!(pkt.total_len(), 2);
         assert_eq!(pkt.version(), Ver::X01 as u8);

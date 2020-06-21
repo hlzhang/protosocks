@@ -7,19 +7,14 @@ use num_traits::FromPrimitive;
 use snafu::Snafu;
 
 pub use addr::{Addr as SocksAddr, HasAddr};
-pub use cmd_rep::{
-    CmdRepr, Packet as CmdPacket,
-    RepRepr, Packet as RepPacket
-};
+pub use cmd_rep::{CmdRepr, Packet as CmdPacket, Packet as RepPacket, RepRepr};
 pub use method_selection::{
-    ReplyPacket as MethodPacket, ReplyRepr as MethodRepr,
-    RequestPacket as MethodsPacket, RequestRepr as MethodsRepr,
+    ReplyPacket as MethodPacket, ReplyRepr as MethodRepr, RequestPacket as MethodsPacket,
+    RequestRepr as MethodsRepr,
 };
 pub use rfc1929::{
     ReplyPacket as AuthReplyPacket, ReplyRepr as AuthReplyRepr, RequestPacket as UserPassPacket,
-    RequestRepr as UserPassRepr,
-    Status,
-    Ver as Rfc1929Ver
+    RequestRepr as UserPassRepr, Status, Ver as Rfc1929Ver,
 };
 pub use udp::{Packet as UdpPacket, Repr as UdpRepr};
 
@@ -334,11 +329,11 @@ impl From<Rep> for u8 {
 }
 
 pub(crate) trait Encodable {
-    fn try_encode(&self, dst: &mut BytesMut) -> Result<()>;
+    fn encode_into(&self, dst: &mut BytesMut);
 }
 
 pub trait Encoder<Item> {
-    fn encode(item: &Item, dst: &mut BytesMut) -> Result<()>;
+    fn encode(item: &Item, dst: &mut BytesMut);
 }
 
 pub trait Decoder<Item> {
