@@ -1,6 +1,8 @@
 use core::cmp::min;
 use core::convert::TryFrom;
+use core::fmt::{self, Display};
 
+use serde::export::Formatter;
 use smolsocket::{port_from_bytes, port_to_bytes, SocketAddr};
 
 use crate::field::Field;
@@ -324,6 +326,15 @@ impl TryFrom<&[u8]> for Addr {
                 l if l < total_len => Err(Error::Truncated),
                 _ => Err(Error::Malformed),
             }
+        }
+    }
+}
+
+impl Display for Addr {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Addr::SocketAddr(addr) => write!(f, "{}", addr),
+            Addr::DomainPort(domain, port) => write!(f, "{}:{}", domain, port),
         }
     }
 }
