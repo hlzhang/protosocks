@@ -282,6 +282,39 @@ pub struct Frag {
 }
 
 impl Frag {
+    pub fn new_frags(addr: SocksAddr, payload: Bytes) -> Vec<Self> {
+        let mut frags = Vec::new();
+        // The maximum safe UDP payload is 508 bytes
+        if payload.len() <= 508 {
+            frags.push(Frag {
+                frag: 0x00,
+                addr,
+                payload,
+            })
+        } else {
+            let mut frag = 0x01 as u8;
+            let mut chunks = payload.chunks(508).peekable();
+            while let Some(chunk) = chunks.next() {
+                if chunks.peek().is_some() {
+                    frags.push(Frag {
+                        frag,
+                        addr: addr.clone(),
+                        payload: Bytes::copy_from_slice(chunk),
+                    });
+                } else {
+                    // last
+                    frags.push(Frag {
+                        frag: frag | 0b1000_0000,
+                        addr: addr.clone(),
+                        payload: Bytes::copy_from_slice(chunk),
+                    })
+                }
+                frag += 0x01;
+            }
+        }
+        frags
+    }
+
     /// Parse a packet and return a high-level representation.
     pub fn parse<T: AsRef<[u8]> + ?Sized>(packet: &Packet<&T>) -> Result<Frag> {
         packet.check_header_len()?;
