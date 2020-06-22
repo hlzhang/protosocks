@@ -282,6 +282,13 @@ pub struct RequestRepr {
 }
 
 impl RequestRepr {
+    pub fn new(uname: &str, passwd: &str) -> Self {
+        RequestRepr {
+            uname: uname.to_string(),
+            passwd: passwd.to_string(),
+        }
+    }
+
     /// Parse a packet and return a high-level representation.
     pub fn parse<T: AsRef<[u8]> + ?Sized>(packet: &RequestPacket<&T>) -> Result<RequestRepr> {
         packet.check_len()?;

@@ -1,6 +1,7 @@
 use core::convert::TryFrom;
+use std::io::Write;
 
-use bytes::{Buf, BytesMut};
+use bytes::{Buf, Bytes, BytesMut};
 use smolsocket::port_from_bytes;
 
 use crate::field::Field;
@@ -138,6 +139,10 @@ impl<T: AsRef<[u8]>> Packet<T> {
     pub fn port(&self) -> u16 {
         self.0.port()
     }
+
+    pub fn take_buffer(self) -> T {
+        self.0.take_buffer()
+    }
 }
 
 impl<'a, T: AsRef<[u8]> + ?Sized> Packet<&'a T> {
@@ -239,7 +244,6 @@ impl Repr {
     pub fn parse<T: AsRef<[u8]> + ?Sized>(packet: &Packet<&T>) -> Result<Repr> {
         packet.check_header_len()?;
 
-        // Version 5 is expected.
         if packet.rsv() != 0 as u16 {
             return Err(Error::Malformed);
         }
@@ -269,13 +273,63 @@ impl Repr {
     }
 }
 
-impl Decoder<Repr> for Repr {
+/// A high-level representation of a UDP frag packet.
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct Frag {
+    pub frag: u8,
+    pub addr: SocksAddr,
+    pub payload: Bytes,
+}
+
+impl Frag {
+    /// Parse a packet and return a high-level representation.
+    pub fn parse<T: AsRef<[u8]> + ?Sized>(packet: &Packet<&T>) -> Result<Frag> {
+        packet.check_header_len()?;
+
+        if packet.rsv() != 0 as u16 {
+            return Err(Error::Malformed);
+        }
+        let frag = packet.as_ref()[field::UDP_FRAG];
+        if frag > 127 {
+            return Err(Error::Malformed);
+        }
+
+        Ok(Frag {
+            frag,
+            addr: SocksAddr::try_from(packet.socks_addr())?,
+            payload: Bytes::copy_from_slice(packet.data()),
+        })
+    }
+
+    fn header_len(&self) -> usize {
+        let addr_len = self.addr.addr_len();
+        field_port(field::ADDR_PORT.start, addr_len).end
+    }
+
+    /// Return the length of that will be emitted from this high-level representation.
+    pub fn buffer_len(&self) -> usize {
+        self.header_len() + self.payload.len()
+    }
+
+    /// Emit a high-level representation into a packet.
+    pub fn emit<T: AsRef<[u8]> + AsMut<[u8]>>(&self, packet: &mut Packet<T>) {
+        // packet.set_rsv(0);
+        packet.set_frag(self.frag);
+        packet.set_socks_addr(&self.addr.to_vec());
+        packet
+            .data_mut()
+            .write_all(self.payload.as_ref())
+            .expect("should write whole payload");
+    }
+}
+
+impl Decoder<Frag> for Frag {
     fn decode(src: &mut BytesMut) -> Result<Option<Self>> {
         let pkt = Packet::new_unchecked(src.as_ref());
-        match Repr::parse(&pkt) {
-            Ok(repr) => {
-                src.advance(repr.buffer_len());
-                Ok(Some(repr))
+        match Frag::parse(&pkt) {
+            Ok(frag) => {
+                src.advance(frag.buffer_len());
+                Ok(Some(frag))
             }
             Err(Error::Truncated) => Ok(None),
             Err(err) => Err(err),
@@ -283,7 +337,7 @@ impl Decoder<Repr> for Repr {
     }
 }
 
-impl Encodable for Repr {
+impl Encodable for Frag {
     fn encode_into(&self, dst: &mut BytesMut) {
         if dst.len() < self.buffer_len() {
             dst.resize(self.buffer_len(), 0);
@@ -293,8 +347,8 @@ impl Encodable for Repr {
     }
 }
 
-impl Encoder<Repr> for Repr {
-    fn encode(item: &Repr, dst: &mut BytesMut) {
+impl Encoder<Frag> for Frag {
+    fn encode(item: &Frag, dst: &mut BytesMut) {
         item.encode_into(dst);
     }
 }
@@ -321,7 +375,7 @@ mod tests {
         assert_eq!(truncated.check_header_len(), Err(Error::Truncated));
         let mut truncated_bytes_mut = BytesMut::new();
         truncated_bytes_mut.extend(truncated_bytes);
-        assert_eq!(Repr::decode(&mut truncated_bytes_mut), Ok(None));
+        assert_eq!(Frag::decode(&mut truncated_bytes_mut), Ok(None));
 
         let mut truncated_bytes = vec![0x00 as u8; 5];
         let mut truncated = Packet::new_unchecked(&mut truncated_bytes);
@@ -338,14 +392,14 @@ mod tests {
         let mut malformed_bytes_mut = BytesMut::new();
         malformed_bytes_mut.extend(malformed_bytes);
         assert_eq!(
-            Repr::decode(&mut malformed_bytes_mut),
+            Frag::decode(&mut malformed_bytes_mut),
             Err(Error::Malformed)
         );
     }
 
     #[cfg(feature = "proto-ipv4")]
     #[test]
-    fn test_data_len_0() {
+    fn test_repr_data_len_0() {
         let socket_addr = SocketAddr::new_ip4_port(127, 0, 0, 1, 80);
         let addr = SocksAddr::SocketAddr(socket_addr);
         let repr = Repr {
@@ -390,15 +444,127 @@ mod tests {
         let parsed = Repr::parse(&Packet::new_checked(pkt.buffer_ref()).unwrap()).unwrap();
         assert_eq!(parsed, repr);
 
+        let repr = Repr {
+            frag: 0,
+            addr: addr.clone(),
+            payload_len: 0,
+        };
         let mut bytes_mut = BytesMut::new();
-        Repr::encode(&repr, &mut bytes_mut);
-        let decoded = Repr::decode(&mut bytes_mut);
-        assert_eq!(decoded, Ok(Some(repr)));
+        bytes_mut.resize(repr.buffer_len(), 0x00);
+        let mut pkt = Packet::new_unchecked(bytes_mut);
+        repr.emit(&mut pkt);
+        pkt.set_frag(128);
+        let bytes_mut = pkt.take_buffer();
+        assert_eq!(
+            Repr::parse(&Packet::new_unchecked(bytes_mut.as_ref())),
+            Err(Error::Malformed)
+        );
+
+        let frag = Repr {
+            frag: 0,
+            addr,
+            payload_len: 0,
+        };
+        let mut bytes_mut = BytesMut::new();
+        bytes_mut.resize(frag.buffer_len(), 0x00);
+        let mut pkt = Packet::new_unchecked(bytes_mut);
+        frag.emit(&mut pkt);
+        let mut bytes_mut = pkt.take_buffer();
+        bytes_mut[0] = 0x01;
+        assert_eq!(
+            Repr::parse(&Packet::new_unchecked(bytes_mut.as_ref())),
+            Err(Error::Malformed)
+        );
     }
 
     #[cfg(feature = "proto-ipv4")]
     #[test]
-    fn test_data_len_1() {
+    fn test_frag_data_len_0() {
+        let socket_addr = SocketAddr::new_ip4_port(127, 0, 0, 1, 80);
+        let addr = SocksAddr::SocketAddr(socket_addr);
+        let frag = Frag {
+            frag: 0,
+            addr: addr.clone(),
+            payload: Bytes::new(),
+        };
+        assert_eq!(frag.addr.total_len(), 7);
+        assert_eq!(frag.buffer_len(), 10);
+        let mut bytes = vec![0x00 as u8; frag.buffer_len()];
+        let mut pkt = Packet::new_unchecked(&mut bytes[..]);
+        assert_eq!(pkt.frag(), 0);
+        pkt.set_frag(1);
+        assert_eq!(pkt.frag(), 1);
+        assert_eq!(pkt.atyp(), 0);
+        pkt.set_atyp(Atyp::V4 as u8);
+        assert_eq!(pkt.atyp(), Atyp::V4 as u8);
+        assert_eq!(&pkt.addr_mut(), &Ipv4Address::new(0, 0, 0, 0).as_bytes());
+        pkt.set_addr(Ipv4Address::new(192, 168, 0, 1).as_bytes());
+        assert_eq!(
+            &pkt.addr_mut(),
+            &Ipv4Address::new(192, 168, 0, 1).as_bytes()
+        );
+        assert_eq!(
+            &Packet::new_unchecked(pkt.as_ref()).addr(),
+            &Ipv4Address::new(192, 168, 0, 1).as_bytes()
+        );
+        assert_eq!(pkt.port(), 0);
+        pkt.set_port(8080);
+        assert_eq!(pkt.port(), 8080);
+
+        frag.emit(&mut pkt);
+        assert_eq!(pkt.field_data(), 10..10);
+        assert_eq!(pkt.data_mut().len(), 0);
+        assert_eq!(Packet::new_checked(pkt.as_ref()).unwrap().data().len(), 0);
+
+        assert_eq!(pkt.atyp(), Atyp::V4 as u8);
+        assert_eq!(&pkt.addr_mut(), &Ipv4Address::new(127, 0, 0, 1).as_bytes());
+        assert_eq!(pkt.port(), 80);
+        assert_eq!(&pkt.socks_addr_mut(), &addr.to_vec().as_slice());
+
+        let parsed = Frag::parse(&Packet::new_checked(pkt.buffer_ref()).unwrap()).unwrap();
+        assert_eq!(parsed, frag);
+
+        let mut bytes_mut = BytesMut::new();
+        Frag::encode(&frag, &mut bytes_mut);
+        let decoded = Frag::decode(&mut bytes_mut);
+        assert_eq!(decoded, Ok(Some(frag)));
+
+        let frag = Frag {
+            frag: 0,
+            addr: addr.clone(),
+            payload: Bytes::new(),
+        };
+        let mut bytes_mut = BytesMut::new();
+        bytes_mut.resize(frag.buffer_len(), 0x00);
+        let mut pkt = Packet::new_unchecked(bytes_mut);
+        frag.emit(&mut pkt);
+        pkt.set_frag(128);
+        let bytes_mut = pkt.take_buffer();
+        assert_eq!(
+            Frag::parse(&Packet::new_unchecked(bytes_mut.as_ref())),
+            Err(Error::Malformed)
+        );
+
+        let frag = Frag {
+            frag: 0,
+            addr,
+            payload: Bytes::new(),
+        };
+        let mut bytes_mut = BytesMut::new();
+        bytes_mut.resize(frag.buffer_len(), 0x00);
+        let mut pkt = Packet::new_unchecked(bytes_mut);
+        frag.emit(&mut pkt);
+        let mut bytes_mut = pkt.take_buffer();
+        bytes_mut[0] = 0x01;
+        assert_eq!(
+            Frag::parse(&Packet::new_unchecked(bytes_mut.as_ref())),
+            Err(Error::Malformed)
+        );
+    }
+
+    #[cfg(feature = "proto-ipv4")]
+    #[test]
+    fn test_repr_data_len_1() {
         let socket_addr = SocketAddr::new_ip4_port(127, 0, 0, 1, 80);
         let addr = SocksAddr::SocketAddr(socket_addr);
         let repr = Repr {
@@ -442,10 +608,58 @@ mod tests {
 
         let parsed = Repr::parse(&Packet::new_checked(pkt.buffer_ref()).unwrap()).unwrap();
         assert_eq!(parsed, repr);
+    }
+
+    #[cfg(feature = "proto-ipv4")]
+    #[test]
+    fn test_frag_data_len_1() {
+        let socket_addr = SocketAddr::new_ip4_port(127, 0, 0, 1, 80);
+        let addr = SocksAddr::SocketAddr(socket_addr);
+        let frag = Frag {
+            frag: 0,
+            addr: addr.clone(),
+            payload: Bytes::from(vec![0xFF]),
+        };
+        assert_eq!(frag.addr.total_len(), 7);
+        assert_eq!(frag.buffer_len(), 11);
+        let mut bytes = vec![0x00 as u8; frag.buffer_len()];
+        let mut pkt = Packet::new_unchecked(&mut bytes[..]);
+        assert_eq!(pkt.frag(), 0);
+        pkt.set_frag(1);
+        assert_eq!(pkt.frag(), 1);
+        assert_eq!(pkt.atyp(), 0);
+        pkt.set_atyp(Atyp::V4 as u8);
+        assert_eq!(pkt.atyp(), Atyp::V4 as u8);
+        assert_eq!(&pkt.addr_mut(), &Ipv4Address::new(0, 0, 0, 0).as_bytes());
+        pkt.set_addr(Ipv4Address::new(192, 168, 0, 1).as_bytes());
+        assert_eq!(
+            &pkt.addr_mut(),
+            &Ipv4Address::new(192, 168, 0, 1).as_bytes()
+        );
+        assert_eq!(
+            &Packet::new_unchecked(pkt.as_ref()).addr(),
+            &Ipv4Address::new(192, 168, 0, 1).as_bytes()
+        );
+        assert_eq!(pkt.port(), 0);
+        pkt.set_port(8080);
+        assert_eq!(pkt.port(), 8080);
+
+        frag.emit(&mut pkt);
+        assert_eq!(pkt.field_data(), 10..11);
+        assert_eq!(pkt.data_mut().len(), 1);
+        assert_eq!(Packet::new_checked(pkt.as_ref()).unwrap().data().len(), 1);
+
+        assert_eq!(pkt.atyp(), Atyp::V4 as u8);
+        assert_eq!(&pkt.addr_mut(), &Ipv4Address::new(127, 0, 0, 1).as_bytes());
+        assert_eq!(pkt.port(), 80);
+        assert_eq!(&pkt.socks_addr_mut(), &addr.to_vec().as_slice());
+
+        let parsed = Frag::parse(&Packet::new_checked(pkt.buffer_ref()).unwrap()).unwrap();
+        assert_eq!(parsed, frag);
 
         let mut bytes_mut = BytesMut::new();
-        Repr::encode(&repr, &mut bytes_mut);
-        let decoded = Repr::decode(&mut bytes_mut);
-        assert_eq!(decoded, Ok(Some(repr)));
+        Frag::encode(&frag, &mut bytes_mut);
+        let decoded = Frag::decode(&mut bytes_mut);
+        assert_eq!(decoded, Ok(Some(frag)));
     }
 }

@@ -16,7 +16,7 @@ pub use rfc1929::{
     ReplyPacket as AuthReplyPacket, ReplyRepr as AuthReplyRepr, RequestPacket as UserPassPacket,
     RequestRepr as UserPassRepr, Status, Ver as Rfc1929Ver,
 };
-pub use udp::{Packet as UdpPacket, Repr as UdpRepr};
+pub use udp::{Frag as UdpFrag, Packet as UdpPacket, Repr as UdpRepr};
 
 mod addr;
 mod cmd_rep;
