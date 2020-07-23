@@ -36,7 +36,7 @@ impl fmt::Display for Error {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-pub enum SocksReply {
+pub enum Reply {
     Method(MethodRepr),
     Auth(AuthReplyRepr),
     Rep(RepRepr),
@@ -44,76 +44,76 @@ pub enum SocksReply {
     Bytes(Bytes),
 }
 
-impl From<MethodRepr> for SocksReply {
+impl From<MethodRepr> for Reply {
     fn from(val: MethodRepr) -> Self {
-        SocksReply::Method(val)
+        Reply::Method(val)
     }
 }
 
-impl From<AuthReplyRepr> for SocksReply {
+impl From<AuthReplyRepr> for Reply {
     fn from(val: AuthReplyRepr) -> Self {
-        SocksReply::Auth(val)
+        Reply::Auth(val)
     }
 }
 
-impl From<RepRepr> for SocksReply {
+impl From<RepRepr> for Reply {
     fn from(val: RepRepr) -> Self {
-        SocksReply::Rep(val)
+        Reply::Rep(val)
     }
 }
 
-impl From<Bytes> for SocksReply {
+impl From<Bytes> for Reply {
     fn from(val: Bytes) -> Self {
-        SocksReply::Bytes(val)
+        Reply::Bytes(val)
     }
 }
 
-impl TryFrom<SocksReply> for MethodRepr {
+impl TryFrom<Reply> for MethodRepr {
     type Error = Error;
 
-    fn try_from(val: SocksReply) -> Result<Self, Error> {
+    fn try_from(val: Reply) -> Result<Self, Error> {
         match val {
-            SocksReply::Method(val) => Ok(val),
+            Reply::Method(val) => Ok(val),
             _ => Err(Error::TypeMismatch),
         }
     }
 }
 
-impl TryFrom<SocksReply> for AuthReplyRepr {
+impl TryFrom<Reply> for AuthReplyRepr {
     type Error = Error;
 
-    fn try_from(val: SocksReply) -> Result<Self, Error> {
+    fn try_from(val: Reply) -> Result<Self, Error> {
         match val {
-            SocksReply::Auth(val) => Ok(val),
+            Reply::Auth(val) => Ok(val),
             _ => Err(Error::TypeMismatch),
         }
     }
 }
 
-impl TryFrom<SocksReply> for RepRepr {
+impl TryFrom<Reply> for RepRepr {
     type Error = Error;
 
-    fn try_from(val: SocksReply) -> Result<Self, Error> {
+    fn try_from(val: Reply) -> Result<Self, Error> {
         match val {
-            SocksReply::Rep(val) => Ok(val),
+            Reply::Rep(val) => Ok(val),
             _ => Err(Error::TypeMismatch),
         }
     }
 }
 
-impl TryFrom<SocksReply> for Bytes {
+impl TryFrom<Reply> for Bytes {
     type Error = Error;
 
-    fn try_from(val: SocksReply) -> Result<Self, Error> {
+    fn try_from(val: Reply) -> Result<Self, Error> {
         match val {
-            SocksReply::Bytes(val) => Ok(val),
+            Reply::Bytes(val) => Ok(val),
             _ => Err(Error::TypeMismatch),
         }
     }
 }
 
 #[derive(Debug, PartialEq, Eq)]
-pub enum SocksRequest {
+pub enum Request {
     Methods(MethodsRepr),
     Auth(UserPassRepr),
     Cmd(CmdRepr),
@@ -121,82 +121,82 @@ pub enum SocksRequest {
     Bytes(Bytes),
 }
 
-impl From<MethodsRepr> for SocksRequest {
+impl From<MethodsRepr> for Request {
     fn from(val: MethodsRepr) -> Self {
-        SocksRequest::Methods(val)
+        Request::Methods(val)
     }
 }
 
-impl From<UserPassRepr> for SocksRequest {
+impl From<UserPassRepr> for Request {
     fn from(val: UserPassRepr) -> Self {
-        SocksRequest::Auth(val)
+        Request::Auth(val)
     }
 }
 
-impl From<CmdRepr> for SocksRequest {
+impl From<CmdRepr> for Request {
     fn from(val: CmdRepr) -> Self {
-        SocksRequest::Cmd(val)
+        Request::Cmd(val)
     }
 }
 
-impl From<Bytes> for SocksRequest {
+impl From<Bytes> for Request {
     fn from(val: Bytes) -> Self {
-        SocksRequest::Bytes(val)
+        Request::Bytes(val)
     }
 }
 
-impl TryFrom<SocksRequest> for MethodsRepr {
+impl TryFrom<Request> for MethodsRepr {
     type Error = Error;
 
-    fn try_from(val: SocksRequest) -> Result<Self, Error> {
+    fn try_from(val: Request) -> Result<Self, Error> {
         match val {
-            SocksRequest::Methods(val) => Ok(val),
+            Request::Methods(val) => Ok(val),
             _ => Err(Error::TypeMismatch),
         }
     }
 }
 
-impl TryFrom<SocksRequest> for UserPassRepr {
+impl TryFrom<Request> for UserPassRepr {
     type Error = Error;
 
-    fn try_from(val: SocksRequest) -> Result<Self, Error> {
+    fn try_from(val: Request) -> Result<Self, Error> {
         match val {
-            SocksRequest::Auth(val) => Ok(val),
+            Request::Auth(val) => Ok(val),
             _ => Err(Error::TypeMismatch),
         }
     }
 }
 
-impl TryFrom<SocksRequest> for CmdRepr {
+impl TryFrom<Request> for CmdRepr {
     type Error = Error;
 
-    fn try_from(val: SocksRequest) -> Result<Self, Error> {
+    fn try_from(val: Request) -> Result<Self, Error> {
         match val {
-            SocksRequest::Cmd(val) => Ok(val),
+            Request::Cmd(val) => Ok(val),
             _ => Err(Error::TypeMismatch),
         }
     }
 }
 
-impl TryFrom<SocksRequest> for Bytes {
+impl TryFrom<Request> for Bytes {
     type Error = Error;
 
-    fn try_from(val: SocksRequest) -> Result<Self, Error> {
+    fn try_from(val: Request) -> Result<Self, Error> {
         match val {
-            SocksRequest::Bytes(val) => Ok(val),
+            Request::Bytes(val) => Ok(val),
             _ => Err(Error::TypeMismatch),
         }
     }
 }
 
-impl ProtocolEncoder<SocksRequest> for SocksRequest {
-    fn encode(item: &SocksRequest, mut dst: &mut BytesMut) {
+impl ProtocolEncoder<Request> for Request {
+    fn encode(item: &Request, mut dst: &mut BytesMut) {
         // item.encode_into(dst);
         match item {
-            SocksRequest::Methods(req) => MethodsRepr::encode(req, &mut dst),
-            SocksRequest::Auth(req) => UserPassRepr::encode(req, &mut dst),
-            SocksRequest::Cmd(req) => CmdRepr::encode(req, &mut dst),
-            SocksRequest::Bytes(req) => dst.extend(req),
+            Request::Methods(req) => MethodsRepr::encode(req, &mut dst),
+            Request::Auth(req) => UserPassRepr::encode(req, &mut dst),
+            Request::Cmd(req) => CmdRepr::encode(req, &mut dst),
+            Request::Bytes(req) => dst.extend(req),
         }
     }
 }
