@@ -2,8 +2,8 @@ use core::convert::TryFrom;
 
 use bytes::{Buf, BytesMut};
 
+use super::{Cmd, Decoder, Encodable, Encoder, Error, field, HasAddr, Rep, Result, SocksAddr, Ver};
 use super::addr::field_port;
-use super::{field, Cmd, Decoder, Encodable, Encoder, Error, HasAddr, Rep, Result, SocksAddr, Ver};
 
 // Requests
 //
@@ -285,7 +285,6 @@ impl<T: AsRef<[u8]>> AsRef<[u8]> for Packet<T> {
 /// A high-level representation of a Cmd packet.
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct CmdRepr {
-    pub ver: Ver,
     pub cmd: Cmd,
     pub addr: SocksAddr,
 }
@@ -304,7 +303,6 @@ impl CmdRepr {
         }
 
         Ok(CmdRepr {
-            ver: Ver::SOCKS5,
             cmd: Cmd::try_from(packet.cmd_or_rep())?,
             addr: SocksAddr::try_from(packet.socks_addr())?,
         })
@@ -357,7 +355,6 @@ impl Encoder<CmdRepr> for CmdRepr {
 /// A high-level representation of a Rep packet.
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct RepRepr {
-    pub ver: Ver,
     pub rep: Rep,
     pub addr: SocksAddr,
 }
@@ -376,7 +373,6 @@ impl RepRepr {
         }
 
         Ok(RepRepr {
-            ver: Ver::SOCKS5,
             rep: Rep::try_from(packet.cmd_or_rep())?,
             addr: SocksAddr::try_from(packet.socks_addr())?,
         })
@@ -478,7 +474,6 @@ mod tests {
         let socket_addr = SocketAddr::new_ip4_port(127, 0, 0, 1, 80);
         let socks_addr = SocksAddr::SocketAddr(socket_addr);
         let repr = CmdRepr {
-            ver: Ver::SOCKS5,
             cmd: Cmd::Connect,
             addr: socks_addr.clone(),
         };
@@ -525,7 +520,6 @@ mod tests {
         let socket_addr = SocketAddr::new_ip6_port(0, 0, 0, 0, 0, 0, 0, 1, 80);
         let socks_addr = SocksAddr::SocketAddr(socket_addr);
         let repr = CmdRepr {
-            ver: Ver::SOCKS5,
             cmd: Cmd::Connect,
             addr: socks_addr.clone(),
         };
@@ -573,7 +567,6 @@ mod tests {
     fn test_cmd_connect_domain() {
         let socks_addr = SocksAddr::DomainPort("google.com".to_string(), 443);
         let repr = CmdRepr {
-            ver: Ver::SOCKS5,
             cmd: Cmd::Connect,
             addr: socks_addr.clone(),
         };
@@ -650,7 +643,6 @@ mod tests {
         let socket_addr = SocketAddr::new_ip4_port(127, 0, 0, 1, 80);
         let socks_addr = SocksAddr::SocketAddr(socket_addr);
         let repr = RepRepr {
-            ver: Ver::SOCKS5,
             rep: Rep::Success,
             addr: socks_addr.clone(),
         };
@@ -697,7 +689,6 @@ mod tests {
         let socket_addr = SocketAddr::new_ip6_port(0, 0, 0, 0, 0, 0, 0, 1, 80);
         let socks_addr = SocksAddr::SocketAddr(socket_addr);
         let repr = RepRepr {
-            ver: Ver::SOCKS5,
             rep: Rep::Success,
             addr: socks_addr.clone(),
         };
@@ -745,7 +736,6 @@ mod tests {
     fn test_rep_success_domain() {
         let socks_addr = SocksAddr::DomainPort("google.com".to_string(), 443);
         let repr = RepRepr {
-            ver: Ver::SOCKS5,
             rep: Rep::Success,
             addr: socks_addr.clone(),
         };
