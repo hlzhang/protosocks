@@ -128,12 +128,22 @@ use super::addr::field_port;
 // the authentication method in use.
 //
 #[derive(Debug, PartialEq, Clone)]
-pub struct Packet<T: AsRef<[u8]>>(HasAddr<T>);
+pub struct Packet<T: AsRef<[u8]>> {
+    compact: bool,
+    addr: HasAddr<T>,
+}
+
+const FIELD_COMPACT_ATYP: usize = 1;
+const FIELD_COMPACT_ADDR_PORT: crate::field::Rest = 2..;
+const FIELD_COMPACT_CMD_OR_REP: usize = 0;
 
 impl<T: AsRef<[u8]>> Packet<T> {
     /// Imbue a raw octet buffer with RFC1928 request packet structure.
     pub fn new_unchecked(buffer: T) -> Packet<T> {
-        Packet(HasAddr::new_unchecked(field::ATYP, buffer))
+        Packet {
+            compact: false,
+            addr: HasAddr::new_unchecked(field::ATYP, buffer),
+        }
     }
 
     /// Shorthand for a combination of [new_unchecked] and [check_len].
@@ -146,9 +156,22 @@ impl<T: AsRef<[u8]>> Packet<T> {
         Ok(packet)
     }
 
+    pub fn new_compact_unchecked(buffer: T) -> Packet<T> {
+        Packet {
+            compact: true,
+            addr: HasAddr::new_unchecked(FIELD_COMPACT_ATYP, buffer),
+        }
+    }
+
+    pub fn new_compact_checked(buffer: T) -> Result<Packet<T>> {
+        let packet = Self::new_compact_unchecked(buffer);
+        packet.check_len()?;
+        Ok(packet)
+    }
+
     #[inline]
     fn buffer_ref(&self) -> &[u8] {
-        self.0.buffer.as_ref()
+        self.addr.buffer.as_ref()
     }
 
     /// Ensure that no accessor method will panic if called.
@@ -159,7 +182,7 @@ impl<T: AsRef<[u8]>> Packet<T> {
     /// [set_methods]: #method.set_socks_addr
     #[inline]
     pub fn check_len(&self) -> Result<()> {
-        self.0.check_addr_len()?;
+        self.addr.check_addr_len()?;
         if self.buffer_ref().len() > self.total_len() {
             Err(Error::Malformed)
         } else {
@@ -170,37 +193,45 @@ impl<T: AsRef<[u8]>> Packet<T> {
     /// Return the length (unchecked).
     #[inline]
     pub fn total_len(&self) -> usize {
-        self.0.len_to_port()
+        self.addr.len_to_port()
     }
 
     /// Return the version field.
     #[inline]
     pub fn version(&self) -> u8 {
-        let data = self.buffer_ref();
-        data[field::VER]
+        if self.compact {
+            Ver::SOCKS5.into()
+        } else {
+            let data = self.buffer_ref();
+            data[field::VER]
+        }
     }
 
     /// Return the cmd of request or rep of reply.
     #[inline]
     pub fn cmd_or_rep(&self) -> u8 {
         let data = self.buffer_ref();
-        data[field::CMD_OR_REP]
+        if self.compact {
+            data[FIELD_COMPACT_CMD_OR_REP]
+        } else {
+            data[field::CMD_OR_REP]
+        }
     }
 
     /// Return the atyp.
     #[inline]
     pub fn atyp(&self) -> u8 {
-        self.0.atyp()
+        self.addr.atyp()
     }
 
     /// Return the dst port of request or bnd port of reply (unchecked).
     #[inline]
     pub fn port(&self) -> u16 {
-        self.0.port()
+        self.addr.port()
     }
 
     pub fn take_buffer(self) -> T {
-        self.0.take_buffer()
+        self.addr.take_buffer()
     }
 }
 
@@ -208,70 +239,77 @@ impl<'a, T: AsRef<[u8]> + ?Sized> Packet<&'a T> {
     /// Return a pointer to the addr (unchecked).
     #[inline]
     pub fn addr(&self) -> &'a [u8] {
-        self.0.addr()
+        self.addr.addr()
     }
 
     /// Return a pointer to the socks addr (atyp, addr, and port) (unchecked).
     #[inline]
     pub fn socks_addr(&self) -> &'a [u8] {
-        self.0.socks_addr()
+        self.addr.socks_addr()
     }
 }
 
 impl<T: AsRef<[u8]> + AsMut<[u8]>> Packet<T> {
     #[inline]
     fn buffer_mut(&mut self) -> &mut [u8] {
-        self.0.buffer.as_mut()
+        self.addr.buffer.as_mut()
     }
 
     /// Set the version field.
     #[inline]
     pub fn set_version(&mut self, value: u8) {
-        let data = self.buffer_mut();
-        data[field::VER] = value;
+        if !self.compact {
+            let data = self.buffer_mut();
+            data[field::VER] = value;
+        }
     }
 
     /// Set the cmd or rep.
     #[inline]
     pub fn set_cmd_or_rep(&mut self, value: u8) {
-        let data = self.buffer_mut();
-        data[field::CMD_OR_REP] = value;
+        if self.compact {
+            let data = self.buffer_mut();
+            data[FIELD_COMPACT_CMD_OR_REP] = value;
+        } else {
+            let data = self.buffer_mut();
+            data[field::CMD_OR_REP] = value;
+        }
     }
 
     /// Set the atyp.
     #[inline]
     pub fn set_atyp(&mut self, value: u8) {
-        self.0.set_atyp(value)
+        self.addr.set_atyp(value)
     }
 
     /// Set the addr (unchecked).
     #[inline]
     pub fn set_addr(&mut self, value: &[u8]) {
-        self.0.set_addr(value)
+        self.addr.set_addr(value)
     }
 
     /// Set the port (unchecked).
     #[inline]
     pub fn set_port(&mut self, value: u16) {
-        self.0.set_port(value)
+        self.addr.set_port(value)
     }
 
     /// Set the socks addr (atyp, addr, and port) (unchecked).
     #[inline]
     pub fn set_socks_addr(&mut self, value: &[u8]) {
-        self.0.set_socks_addr(value)
+        self.addr.set_socks_addr(value)
     }
 
     /// Return a mutable pointer to the addr (unchecked).
     #[inline]
     pub fn addr_mut(&mut self) -> &mut [u8] {
-        self.0.addr_mut()
+        self.addr.addr_mut()
     }
 
     /// Return a mutable pointer to the socks addr (atyp, addr, and port) (unchecked).
     #[inline]
     pub fn socks_addr_mut(&mut self) -> &mut [u8] {
-        self.0.socks_addr_mut()
+        self.addr.socks_addr_mut()
     }
 }
 
@@ -295,11 +333,13 @@ impl CmdRepr {
         packet.check_len()?;
 
         // Version 5 is expected.
-        if packet.version() != Ver::SOCKS5 as u8 {
-            return Err(Error::Malformed);
-        }
-        if packet.as_ref()[field::RSV] != 0 {
-            return Err(Error::Malformed);
+        if packet.compact {
+            if packet.version() != Ver::SOCKS5 as u8 {
+                return Err(Error::Malformed);
+            }
+            if packet.as_ref()[field::RSV] != 0 {
+                return Err(Error::Malformed);
+            }
         }
 
         Ok(CmdRepr {
@@ -319,6 +359,11 @@ impl CmdRepr {
         packet.set_version(Ver::SOCKS5.into());
         packet.set_cmd_or_rep(self.cmd as u8);
         packet.set_socks_addr(&self.addr.to_vec());
+    }
+
+    pub fn compact_buffer_len(&self) -> usize {
+        let addr_len = self.addr.addr_len();
+        field_port(FIELD_COMPACT_ADDR_PORT.start, addr_len).end
     }
 }
 
