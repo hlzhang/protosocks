@@ -1,8 +1,18 @@
 use core::cmp::min;
 use core::convert::TryFrom;
 use core::fmt::{self, Display};
+use core::str::FromStr;
+use std::net::IpAddr;
 
 use serde::export::Formatter;
+#[cfg(all(feature = "dns", feature = "std"))]
+use trust_dns_client::{
+    client::{Client, SyncClient},
+    op::DnsResponse,
+    rr::{DNSClass, Name, RData, Record, RecordType},
+    udp::UdpClientConnection,
+};
+
 use smolsocket::{port_from_bytes, port_to_bytes, SocketAddr};
 
 use crate::field::Field;
@@ -33,6 +43,27 @@ pub(crate) fn field_port(start: usize, addr_len: usize) -> Field {
 #[inline]
 pub(crate) fn field_socks_addr(start: usize, addr_len: usize) -> Field {
     field_addr(start + 1, addr_len).start - 1..field_port(start + 1, addr_len).end
+}
+
+/// nameserver e.g. 8.8.8.8:53
+#[cfg(all(feature = "dns", feature = "std"))]
+pub fn resolve(domain: &str, nameserver: &str) -> Result<Option<std::net::IpAddr>> {
+    let address = nameserver.parse()
+        .map_err(|_| Error::AddrParseError)?;
+    let conn = UdpClientConnection::new(address)
+        .map_err(|_| Error::AddrParseError)?;
+    let client = SyncClient::new(conn);
+    let name = Name::from_str((domain.to_owned() + ".").as_str())
+        .map_err(|_| Error::AddrParseError)?;
+    let response: DnsResponse = client.query(&name, DNSClass::IN, RecordType::A)
+        .map_err(|_| Error::AddrParseError)?;
+
+    let answers: &[Record] = response.answers();
+    Ok(if let &RData::A(ref ip) = answers[0].rdata() {
+        Some(IpAddr::V4(ip.clone()))
+    } else {
+        None
+    })
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -279,6 +310,25 @@ impl Addr {
             }
         }
     }
+
+    // TODO emmit
+
+    /// nameserver e.g. 8.8.8.8:53
+    #[cfg(all(feature = "dns", feature = "std"))]
+    pub fn resolve(&self, nameserver: &str) -> Result<Option<SocketAddr>> {
+        Ok(match self {
+            #[cfg(any(feature = "proto-ipv4", feature = "proto-ipv6"))]
+            Addr::SocketAddr(socket_addr) => Some(socket_addr.clone()),
+            Addr::DomainPort(domain, port) => {
+                let resolved = resolve(domain.as_str(), nameserver)?;
+                if let Some(ip_addr) = resolved {
+                    Some(SocketAddr::new(ip_addr.into(), port.clone())?)
+                } else {
+                    None
+                }
+            }
+        })
+    }
 }
 
 impl TryFrom<&[u8]> for Addr {
@@ -314,7 +364,7 @@ impl TryFrom<&[u8]> for Addr {
                             let domain = String::from_utf8_lossy(
                                 &value[field_addr.start + 1..field_addr.end],
                             )
-                            .to_string();
+                                .to_string();
                             let port_bytes = &value[field_port];
                             let port = port_from_bytes(port_bytes[0], port_bytes[1]);
                             Ok(Addr::DomainPort(domain, port))
@@ -341,11 +391,14 @@ impl Display for Addr {
 
 #[cfg(test)]
 mod tests {
-    use smolsocket::{port_to_bytes, SocketAddr};
     #[cfg(feature = "proto-ipv4")]
     use smoltcp::wire::Ipv4Address;
     #[cfg(feature = "proto-ipv6")]
     use smoltcp::wire::Ipv6Address;
+    #[cfg(feature = "std")]
+    use ::std::env;
+
+    use smolsocket::{port_to_bytes, SocketAddr};
 
     use super::*;
 
@@ -567,6 +620,24 @@ mod tests {
         );
         let parsed = Addr::try_from(socks_addr.to_vec().as_slice()).expect("should success");
         assert_eq!(parsed.to_vec(), socks_addr.to_vec());
+    }
+
+    #[cfg(all(feature = "dns", feature = "std"))]
+    #[test]
+    fn test_socks_addr_domain_resolve() {
+        if env::var("RUST_LOG").is_err() {
+            env::set_var("RUST_LOG", "debug");
+        }
+        let _ = pretty_env_logger::try_init_timed();
+
+        let socks_addr = Addr::DomainPort("bing.com".to_string(), 443);
+        let resolved = socks_addr.resolve("8.8.8.8:53");
+        info!("resolved {:?}", resolved);
+        assert!(resolved.is_ok());
+        let option = resolved.unwrap();
+        assert!(option.is_some());
+        let socket_addr = option.unwrap();
+        assert_eq!(socket_addr.len(), 6);
     }
 
     #[test]

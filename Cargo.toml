@@ -24,15 +24,23 @@ num-traits = "0.2"
 num-derive = "0.3"
 serde = "1.0.15"
 serde_derive = "1.0.15"
-smolsocket = { version = "0.3", default-features = false }
+#smolsocket = { version = "0.3", default-features = false }
+smolsocket = { path = "../smolsocket", default-features = false }
 smoltcp = { version = "0.6.0", default-features = false }
 snafu = "0.4.1"
+#trust-dns = { version = "*", default-features = false, features = ["dns-over-https-rustls"], optional = true }
+trust-dns-client = { version = "*", default-features = false, optional = true }
+
+[dev-dependencies]
+pretty_env_logger = "0.3"
 
 [features]
+dns = ["trust-dns-client"]
 std = ["smolsocket/std", "smoltcp/std"]
 "proto-ipv4" = ["smolsocket/proto-ipv4", "smoltcp/proto-ipv4"]
 "proto-ipv6" = ["smolsocket/proto-ipv6", "smoltcp/proto-ipv4"]
 default = [
+  "dns",
   "std",
   "proto-ipv4", "proto-ipv6"
 ]
