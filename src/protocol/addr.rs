@@ -280,38 +280,28 @@ impl Addr {
     }
 
     pub fn to_vec(&self) -> Vec<u8> {
+        let mut vec = vec![0 as u8; self.total_len()];
+        self.emmit(vec.as_mut_slice());
+        vec
+    }
+
+    pub fn emmit(&self, bytes: &mut [u8]) {
+        let total_len = self.total_len();
+        bytes[0] = self.atyp() as u8;
         match self {
             #[cfg(any(feature = "proto-ipv4", feature = "proto-ipv6"))]
-            Addr::SocketAddr(socket_addr) => match socket_addr {
-                #[cfg(feature = "proto-ipv4")]
-                SocketAddr::V4(socket_addr) => {
-                    let mut bytes = Vec::with_capacity(1 + socket_addr.len());
-                    bytes.push(Atyp::V4 as u8);
-                    bytes.extend(socket_addr.to_vec());
-                    bytes
-                }
-                #[cfg(feature = "proto-ipv6")]
-                SocketAddr::V6(socket_addr) => {
-                    let mut bytes = Vec::with_capacity(1 + socket_addr.len());
-                    bytes.push(Atyp::V6 as u8);
-                    bytes.extend(socket_addr.to_vec());
-                    bytes
-                }
-            },
+            Addr::SocketAddr(socket_addr) => {
+                socket_addr.emmit(&mut bytes[1..total_len]);
+            }
             Addr::DomainPort(domain, port) => {
                 let domain_bytes = domain.as_bytes();
-                let mut bytes = Vec::with_capacity(1 + domain_bytes.len() + 2);
-                bytes.push(Atyp::Domain as u8);
                 let domain_len = min(domain_bytes.len(), 255);
-                bytes.push(domain_len as u8);
-                bytes.extend_from_slice(&domain_bytes[0..domain_len]);
-                bytes.extend_from_slice(&port_to_bytes(*port));
-                bytes
+                bytes[1] = domain_len as u8;
+                bytes[2..2 + domain_bytes.len()].copy_from_slice(domain_bytes);
+                &mut bytes[total_len - 2..total_len].copy_from_slice(&port_to_bytes(*port));
             }
         }
     }
-
-    // TODO emmit
 
     /// nameserver e.g. 8.8.8.8:53
     #[cfg(all(feature = "dns", feature = "std"))]
@@ -391,12 +381,13 @@ impl Display for Addr {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "std")]
+    use ::std::env;
+
     #[cfg(feature = "proto-ipv4")]
     use smoltcp::wire::Ipv4Address;
     #[cfg(feature = "proto-ipv6")]
     use smoltcp::wire::Ipv6Address;
-    #[cfg(feature = "std")]
-    use ::std::env;
 
     use smolsocket::{port_to_bytes, SocketAddr};
 
