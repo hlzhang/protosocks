@@ -424,6 +424,29 @@ mod tests {
 
     #[cfg(feature = "proto-ipv4")]
     #[test]
+    fn test_to_string_ipv4() {
+        let socket_addr = SocketAddr::new_ip4_port(127, 0, 0, 1, 80);
+        let socks_addr = Addr::SocketAddr(socket_addr);
+        assert_eq!(socks_addr.to_string(), "127.0.0.1:80");
+    }
+
+    #[cfg(feature = "proto-ipv6")]
+    #[test]
+    fn test_to_string_ipv6() {
+        let socket_addr = SocketAddr::new_ip6_port(0, 0, 0, 0, 0, 0, 0, 1, 80);
+        let socks_addr = Addr::SocketAddr(socket_addr);
+        assert_eq!(socks_addr.to_string(), "[::1]:80");
+    }
+
+    #[test]
+    fn test_to_string_domain() {
+        let google_com = "google.com".to_string();
+        let socks_addr = Addr::DomainPort(google_com, 443);
+        assert_eq!(socks_addr.to_string(), "google.com:443");
+    }
+
+    #[cfg(feature = "proto-ipv4")]
+    #[test]
     fn test_has_addr_invalid_addr_len_ip4() {
         let empty_ip4 = vec![0x00 as u8; 7];
         assert_eq!(empty_ip4.len(), 7);
