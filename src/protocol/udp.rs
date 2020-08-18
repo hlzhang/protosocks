@@ -315,6 +315,10 @@ impl Frag {
         frags
     }
 
+    pub fn is_end_of_seq(frag: u8) -> bool {
+        frag & 0b1000_0000 != 0
+    }
+
     /// Parse a packet and return a high-level representation.
     pub fn parse<T: AsRef<[u8]> + ?Sized>(packet: &Packet<&T>) -> Result<Frag> {
         packet.check_header_len()?;
