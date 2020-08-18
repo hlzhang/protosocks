@@ -8,7 +8,7 @@ use snafu::Snafu;
 
 use crate::field::Field;
 
-use super::{field, Decoder, Encodable, Encoder, Error, Result};
+use super::{Decoder, Encodable, Encoder, Error, field, Result};
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, FromPrimitive, Hash, PartialEq, Serialize, Snafu)]
 #[repr(u8)]
@@ -448,6 +448,10 @@ pub struct ReplyRepr {
 }
 
 impl ReplyRepr {
+    pub fn new(status: Status) -> Self {
+        ReplyRepr { status }
+    }
+
     /// Parse a packet and return a high-level representation.
     pub fn parse<T: AsRef<[u8]> + ?Sized>(packet: &ReplyPacket<&T>) -> Result<ReplyRepr> {
         packet.check_len()?;
