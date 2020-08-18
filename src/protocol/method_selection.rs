@@ -2,7 +2,7 @@ use core::convert::TryFrom;
 
 use bytes::{Buf, BytesMut};
 
-use super::{field, Decoder, Encodable, Encoder, Error, Method, Result, ToU8Vec, Ver};
+use super::{Decoder, Encodable, Encoder, Error, field, Method, Result, ToU8Vec, Ver};
 
 pub type Methods = Vec<Method>;
 
@@ -321,11 +321,14 @@ impl<T: AsRef<[u8]>> AsRef<[u8]> for ReplyPacket<T> {
 /// A high-level representation of a Method Selection Reply packet.
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct ReplyRepr {
-    pub ver: Ver,
     pub method: Method,
 }
 
 impl ReplyRepr {
+    pub fn new(method: Method) -> Self {
+        ReplyRepr { method }
+    }
+
     /// Parse a packet and return a high-level representation.
     pub fn parse<T: AsRef<[u8]> + ?Sized>(packet: &ReplyPacket<&T>) -> Result<ReplyRepr> {
         packet.check_len()?;
@@ -336,7 +339,6 @@ impl ReplyRepr {
         }
 
         Ok(ReplyRepr {
-            ver: Ver::SOCKS5,
             method: Method::try_from(packet.method())?,
         })
     }
@@ -429,7 +431,6 @@ mod tests {
         let decoded = RequestRepr::decode(&mut bytes_mut)
             .expect("should success")
             .expect("should present");
-        assert_eq!(decoded.ver, Ver::SOCKS5);
         assert_eq!(decoded.methods.len(), 2);
         assert_eq!(decoded.methods[0], Method::NoAuth);
         assert_eq!(decoded.methods[1], Method::UserPass);
@@ -520,13 +521,11 @@ mod tests {
     #[test]
     fn test_reply_repr_buffer_len() {
         let user_pass = ReplyRepr {
-            ver: Ver::SOCKS5,
             method: Method::UserPass,
         };
         assert_eq!(user_pass.buffer_len(), 2);
 
         let no_auth = ReplyRepr {
-            ver: Ver::SOCKS5,
             method: Method::NoAuth,
         };
         assert_eq!(no_auth.buffer_len(), 2);
@@ -535,27 +534,23 @@ mod tests {
     #[test]
     fn test_reply_repr_emit_parse_no_auth() {
         let no_auth = ReplyRepr {
-            ver: Ver::SOCKS5,
             method: Method::NoAuth,
         };
         assert_eq!(no_auth.buffer_len(), 2);
         let mut bytes_mut = BytesMut::new();
         ReplyRepr::encode(&no_auth, &mut bytes_mut);
         let no_auth_pkt = ReplyPacket::new_checked(bytes_mut.as_ref()).expect("should success");
-        assert_eq!(no_auth_pkt.version(), no_auth.ver as u8);
         assert_eq!(no_auth_pkt.method(), no_auth.method as u8);
 
         let decoded = ReplyRepr::decode(&mut bytes_mut)
             .expect("should success")
             .expect("should present");
-        assert_eq!(decoded.ver, Ver::SOCKS5);
         assert_eq!(decoded.method, Method::NoAuth);
     }
 
     #[test]
     fn test_reply_repr_emit_parse_user_pass() {
         let repr = ReplyRepr {
-            ver: Ver::SOCKS5,
             method: Method::UserPass,
         };
         assert_eq!(repr.buffer_len(), 2);
@@ -564,19 +559,16 @@ mod tests {
         assert_eq!(pkt.len(), 2);
         let mut pkt = ReplyPacket::new_unchecked(pkt);
         repr.emit(&mut pkt);
-        assert_eq!(pkt.version(), repr.ver as u8);
         assert_eq!(pkt.method(), repr.method as u8);
 
         let mut bytes_mut = BytesMut::new();
         ReplyRepr::encode(&repr, &mut bytes_mut);
         let encoded_pkt = ReplyPacket::new_checked(bytes_mut.as_ref()).expect("should success");
-        assert_eq!(encoded_pkt.version(), repr.ver as u8);
         assert_eq!(encoded_pkt.method(), repr.method as u8);
 
         let decoded = ReplyRepr::decode(&mut bytes_mut)
             .expect("should success")
             .expect("should present");
-        assert_eq!(decoded.ver, Ver::SOCKS5);
         assert_eq!(decoded.method, Method::UserPass);
 
         assert_eq!(pkt.as_ref()[0], Ver::SOCKS5 as u8);
