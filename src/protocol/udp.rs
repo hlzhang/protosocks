@@ -315,6 +315,14 @@ impl Frag {
         frags
     }
 
+    pub fn is_frag(&self) -> bool {
+        self.frag != 0
+    }
+
+    pub fn is_last_frag(&self) -> bool {
+        Frag::is_end_of_seq(self.frag)
+    }
+
     pub fn is_end_of_seq(frag: u8) -> bool {
         frag & 0b1000_0000 != 0
     }
