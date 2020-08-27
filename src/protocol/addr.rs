@@ -275,6 +275,13 @@ impl Addr {
         }
     }
 
+    pub fn port(&self) -> u16 {
+        match self {
+            Addr::DomainPort(_domain, port) => *port,
+            Addr::SocketAddr(socket_addr) => socket_addr.port(),
+        }
+    }
+
     pub fn total_len(&self) -> usize {
         1 + self.addr_len() + 2
     }
