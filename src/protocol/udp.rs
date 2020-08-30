@@ -1,13 +1,15 @@
 use core::convert::TryFrom;
 use std::io::Write;
+use std::time::{Duration, SystemTime};
 
 use bytes::{Buf, Bytes, BytesMut};
+
 use smolsocket::port_from_bytes;
 
 use crate::field::Field;
 
 use super::{
-    addr::field_port, field, Decoder, Encodable, Encoder, Error, HasAddr, Result, SocksAddr,
+    addr::field_port, Decoder, Encodable, Encoder, Error, field, HasAddr, Result, SocksAddr,
 };
 
 //
@@ -274,6 +276,20 @@ impl Repr {
 }
 
 /// A high-level representation of a UDP frag packet.
+/// Header size (max for Domain):
+/// IPv4   10 bytes  (RSV(2) + FRAG(1) + (ATYP(1) + IP4(4) + PORT(2)))
+/// IPv6   22 bytes  (RSV(2) + FRAG(1) + (ATYP(1) + IP6(16) + PORT(2)))
+/// Domain 262 bytes (RSV(2) + FRAG(1) + (ATYP(1) + Domain(255) + PORT(2)))
+///
+/// For IPv4
+/// The maximum safe UDP payload is 508 bytes.
+/// Tt is possible to include IP options which can increase the size of the IP header to as much as 60 bytes.
+/// This is a packet size of 576, minus the maximum 60-byte IP header and the 8-byte UDP header.
+/// Any UDP payload this size or smaller is guaranteed to be deliverable over IP (though not guaranteed to be delivered).
+/// Anything larger is allowed to be outright dropped by any router for any reason.
+/// Except on an IPv6-only route, where the maximum payload is 1,212 bytes.
+/// As others have mentioned, additional protocol headers could be added in some circumstances.
+/// A more conservative value of around 300-400 bytes may be preferred instead.
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Frag {
     pub frag: u8,
@@ -282,18 +298,19 @@ pub struct Frag {
 }
 
 impl Frag {
+    pub fn max_safe_payload_size(addr: &SocksAddr) -> usize {
+        let header_len = 3 + addr.total_len();
+        // The maximum safe UDP payload is 508 bytes
+        508 - header_len
+    }
     pub fn new_frags(addr: SocksAddr, payload: Bytes) -> Vec<Self> {
         let mut frags = Vec::new();
-        // The maximum safe UDP payload is 508 bytes
-        if payload.len() <= 508 {
-            frags.push(Frag {
-                frag: 0x00,
-                addr,
-                payload,
-            })
+        let max_payload_len = Frag::max_safe_payload_size(&addr);
+        if payload.len() <= max_payload_len {
+            frags.push(Frag { frag: 0x00, addr, payload })
         } else {
             let mut frag = 0x01 as u8;
-            let mut chunks = payload.chunks(508).peekable();
+            let mut chunks = payload.chunks(max_payload_len).peekable();
             while let Some(chunk) = chunks.next() {
                 if chunks.peek().is_some() {
                     frags.push(Frag {
@@ -313,6 +330,11 @@ impl Frag {
             }
         }
         frags
+    }
+
+    pub fn frag(&self) -> u8 {
+        // frag & 0b0111_1111 (127)
+        self.frag & 0b0111_1111
     }
 
     pub fn is_frag(&self) -> bool {
@@ -398,13 +420,81 @@ impl Encoder<Frag> for Frag {
     }
 }
 
+
+const DURATION_0: Duration = Duration::from_secs(0);
+
+pub struct FragAssembler {
+    pub(crate) slots: Vec<Option<Frag>>,
+    pub(crate) highest: u8,
+    pub(crate) time: Option<SystemTime>,
+}
+
+impl FragAssembler {
+    pub fn new() -> Self {
+        FragAssembler {
+            slots: vec![None; 127],
+            highest: 0,
+            time: None,
+        }
+    }
+
+    pub fn is_frag(udp_frag: &Frag) -> bool {
+        udp_frag.frag != 0
+    }
+
+    pub fn clear(&mut self) {
+        for slot in &mut self.slots {
+            if slot.is_some() {
+                std::mem::replace(slot, None).unwrap();
+            }
+        }
+        self.highest = 0x00;
+    }
+
+    pub fn on_frag(&mut self, udp_frag: Frag, now: &SystemTime) -> Option<Vec<Frag>> {
+        let frag = udp_frag.frag();
+        let time_ok = self.time.map_or(true, |time| now.duration_since(time).unwrap_or(DURATION_0).as_secs() < 10);
+        if frag > self.highest && time_ok {
+            if udp_frag.is_last_frag() {
+                if frag == self.highest + 1 {
+                    let mut result = Vec::with_capacity(127);
+                    for slot in &mut self.slots {
+                        if slot.is_some() {
+                            result.push(std::mem::replace(slot, None).unwrap());
+                        } else {
+                            break;
+                        }
+                    }
+                    result.push(udp_frag);
+                    self.highest = 0;
+                    Some(result)
+                } else {
+                    self.clear();
+                    None
+                }
+            } else {
+                if self.highest == 0 {
+                    self.time = Some(now.clone());
+                }
+                self.slots[frag as usize - 1] = Some(udp_frag);
+                self.highest = frag;
+                None
+            }
+        } else {
+            self.clear();
+            None
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use bytes::BytesMut;
-    #[cfg(any(feature = "proto-ipv4", feature = "proto-ipv6"))]
-    use smolsocket::SocketAddr;
     #[cfg(feature = "proto-ipv4")]
     use smoltcp::wire::Ipv4Address;
+
+    #[cfg(any(feature = "proto-ipv4", feature = "proto-ipv6"))]
+    use smolsocket::SocketAddr;
 
     use crate::Atyp;
 
@@ -706,5 +796,49 @@ mod tests {
         Frag::encode(&frag, &mut bytes_mut);
         let decoded = Frag::decode(&mut bytes_mut);
         assert_eq!(decoded, Ok(Some(frag)));
+    }
+
+    #[cfg(feature = "proto-ipv4")]
+    #[test]
+    pub fn test_frag_assembler() {
+        let now = SystemTime::now();
+        let socket_addr = SocketAddr::new_ip4_port(127, 0, 0, 1, 80);
+        let addr = SocksAddr::SocketAddr(socket_addr);
+        let payload = vec![0x00; 1000];
+        let frags = Frag::new_frags(addr, payload.into());
+        assert_eq!(frags.len(), 3);
+        assert_eq!(frags[0].frag, 1);
+        assert_eq!(frags[0].frag(), 1);
+        assert_eq!(frags[0].is_last_frag(), false);
+        assert_eq!(frags[1].frag, 2);
+        assert_eq!(frags[1].frag(), 2);
+        assert_eq!(frags[1].is_last_frag(), false);
+        assert_eq!(frags[2].frag(), 3);
+        assert_eq!(frags[2].frag, 0b1000_0000 | 3);
+        assert_eq!(frags[2].is_last_frag(), true);
+        let mut assembler = FragAssembler::new();
+        assert_eq!(assembler.on_frag(frags[0].clone(), &now), None);
+        assert_eq!(assembler.slots[0], Some(frags[0].clone()));
+        assert_eq!(assembler.on_frag(frags[1].clone(), &now), None);
+        assert_eq!(assembler.slots[1], Some(frags[1].clone()));
+        assert_eq!(
+            assembler.on_frag(frags[2].clone(), &now),
+            Some(vec![frags[0].clone(), frags[1].clone(), frags[2].clone()])
+        );
+
+        let mut assembler = FragAssembler::new();
+        assert_eq!(assembler.on_frag(frags[2].clone(), &now), None);
+        assert_eq!(assembler.slots[2], None);
+        assert_eq!(assembler.highest, 0);
+
+        let mut assembler = FragAssembler::new();
+        assert_eq!(assembler.on_frag(frags[1].clone(), &now), None);
+        assert_eq!(assembler.slots[1], Some(frags[1].clone()));
+        assert_eq!(assembler.highest, 2);
+        // smaller frag received, clear
+        assert_eq!(assembler.on_frag(frags[0].clone(), &now), None);
+        assert_eq!(assembler.slots[0], None);
+        assert_eq!(assembler.slots[1], None);
+        assert_eq!(assembler.highest, 0);
     }
 }
