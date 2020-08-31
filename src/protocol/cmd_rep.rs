@@ -4,6 +4,8 @@ use bytes::{Buf, BytesMut};
 
 use super::{Cmd, Decoder, Encodable, Encoder, Error, field, HasAddr, Rep, Result, SocksAddr, Ver};
 use super::addr::field_port;
+use std::fmt::{Display, Formatter};
+use std::fmt;
 
 // Requests
 //
@@ -327,7 +329,25 @@ pub struct CmdRepr {
     pub addr: SocksAddr,
 }
 
+impl Display for CmdRepr {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}({})", self.cmd, self.addr)
+    }
+}
+
 impl CmdRepr {
+    pub fn new_connect(addr: SocksAddr) -> Self {
+        CmdRepr { cmd: Cmd::Connect, addr }
+    }
+
+    pub fn new_bind(addr: SocksAddr) -> Self {
+        CmdRepr { cmd: Cmd::Bind, addr }
+    }
+
+    pub fn new_udp_associate(addr: SocksAddr) -> Self {
+        CmdRepr { cmd: Cmd::UdpAssociate, addr }
+    }
+
     /// Parse a packet and return a high-level representation.
     pub fn parse<T: AsRef<[u8]> + ?Sized>(packet: &Packet<&T>) -> Result<CmdRepr> {
         packet.check_len()?;
@@ -470,12 +490,13 @@ impl Encoder<RepRepr> for RepRepr {
 #[cfg(test)]
 mod tests {
     use bytes::BytesMut;
-    #[cfg(any(feature = "proto-ipv4", feature = "proto-ipv6"))]
-    use smolsocket::SocketAddr;
     #[cfg(feature = "proto-ipv4")]
     use smoltcp::wire::Ipv4Address;
     #[cfg(feature = "proto-ipv6")]
     use smoltcp::wire::Ipv6Address;
+
+    #[cfg(any(feature = "proto-ipv4", feature = "proto-ipv6"))]
+    use smolsocket::SocketAddr;
 
     use crate::Atyp;
 

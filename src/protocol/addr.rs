@@ -252,6 +252,14 @@ pub enum Addr {
 }
 
 impl Addr {
+    pub fn new_domain(domain: &str, port: u16) -> Self {
+        Addr::DomainPort(domain.to_string(), port)
+    }
+
+    pub fn new_socket(addr: SocketAddr) -> Self {
+        Addr::SocketAddr(addr)
+    }
+
     pub fn atyp(&self) -> Atyp {
         match self {
             #[cfg(any(feature = "proto-ipv4", feature = "proto-ipv6"))]

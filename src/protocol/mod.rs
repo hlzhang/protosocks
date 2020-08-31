@@ -1,5 +1,6 @@
 use core::convert::TryFrom;
 use core::fmt;
+use std::fmt::{Display, Formatter};
 
 use bytes::BytesMut;
 use num_derive::FromPrimitive;
@@ -202,15 +203,25 @@ impl ToU8Vec<Method> for &[Method] {
 }
 
 /// SOCK5 CMD Type
-#[derive(Clone, Copy, Debug, Deserialize, Eq, FromPrimitive, Hash, PartialEq, Serialize, Snafu)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, FromPrimitive, Hash, PartialEq, Serialize)] //, Snafu
 #[repr(u8)]
 pub enum Cmd {
-    #[snafu(display("Connect"))]
+    // #[snafu(display("Connect"))]
     Connect = 0x01,
-    #[snafu(display("Bind"))]
+    // #[snafu(display("Bind"))]
     Bind = 0x02,
-    #[snafu(display("UDP associate"))]
+    // #[snafu(display("UdpAssociate"))]
     UdpAssociate = 0x03,
+}
+
+impl Display for Cmd {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Cmd::Connect => write!(f, "Connect"),
+            Cmd::Bind => write!(f, "Bind"),
+            Cmd::UdpAssociate => write!(f, "UdpAssociate"),
+        }
+    }
 }
 
 impl TryFrom<u8> for Cmd {
