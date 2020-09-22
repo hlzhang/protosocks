@@ -52,7 +52,7 @@ pub fn resolve(domain: &str, nameserver: &str) -> Result<Option<std::net::IpAddr
         .map_err(|_| Error::AddrParseError)?;
     let conn = UdpClientConnection::new(address)
         .map_err(|_| Error::AddrParseError)?;
-    let client = SyncClient::new(conn);
+    let client = SyncClient::new(conn); // TODO support async client
     let name = Name::from_str((domain.to_owned() + ".").as_str())
         .map_err(|_| Error::AddrParseError)?;
     let response: DnsResponse = client.query(&name, DNSClass::IN, RecordType::A)
