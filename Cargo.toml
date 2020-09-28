@@ -28,6 +28,8 @@ serde_derive = "1.0"
 smolsocket = { path = "../smolsocket", default-features = false }
 smoltcp = { version = "0.6.0", default-features = false }
 snafu = "0.4.1"
+tokio = { version = "0.2.22", default-features = false, features = ["full"], optional = true }
+tokio-util = { version = "0.3.0", features = ["full"], optional = true }
 #trust-dns = { version = "*", default-features = false, features = ["dns-over-https-rustls"], optional = true }
 trust-dns-client = { version = "*", default-features = false, optional = true }
 
@@ -36,11 +38,13 @@ pretty_env_logger = "0.3"
 
 [features]
 dns = ["trust-dns-client"]
+rt_tokio = ["tokio", "tokio-util"]
 std = ["smolsocket/std", "smoltcp/std"]
 "proto-ipv4" = ["smolsocket/proto-ipv4", "smoltcp/proto-ipv4"]
 "proto-ipv6" = ["smolsocket/proto-ipv6", "smoltcp/proto-ipv4"]
 default = [
-  "dns",
-  "std",
-  "proto-ipv4", "proto-ipv6"
+    "dns",
+    "rt_tokio",
+    "std",
+    "proto-ipv4", "proto-ipv6"
 ]
