@@ -1,11 +1,11 @@
 use core::convert::TryFrom;
+use std::fmt::{Display, Formatter};
+use std::fmt;
 
 use bytes::{Buf, BytesMut};
 
 use super::{Cmd, Decoder, Encodable, Encoder, Error, field, HasAddr, Rep, Result, SocksAddr, Ver};
 use super::addr::field_port;
-use std::fmt::{Display, Formatter};
-use std::fmt;
 
 // Requests
 //
@@ -346,6 +346,18 @@ impl CmdRepr {
 
     pub fn new_udp_associate(addr: SocksAddr) -> Self {
         CmdRepr { cmd: Cmd::UdpAssociate, addr }
+    }
+
+    pub fn is_tcp_bind(&self) -> bool {
+        self.cmd == Cmd::Bind
+    }
+
+    pub fn is_tcp_connect(&self) -> bool {
+        self.cmd == Cmd::Connect
+    }
+
+    pub fn is_udo_associate(&self) -> bool {
+        self.cmd == Cmd::UdpAssociate
     }
 
     /// Parse a packet and return a high-level representation.
