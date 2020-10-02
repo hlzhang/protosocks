@@ -436,6 +436,18 @@ pub struct RepRepr {
 }
 
 impl RepRepr {
+    pub fn new(addr: SocksAddr, rep: Rep) -> Self {
+        Self { addr, rep }
+    }
+
+    pub fn new_failure(addr: SocksAddr) -> Self {
+        Self::new(addr, Rep::Failure)
+    }
+
+    pub fn new_success(addr: SocksAddr) -> Self {
+        Self::new(addr, Rep::Success)
+    }
+
     /// Parse a packet and return a high-level representation.
     pub fn parse<T: AsRef<[u8]> + ?Sized>(packet: &Packet<&T>) -> Result<RepRepr> {
         packet.check_len()?;
