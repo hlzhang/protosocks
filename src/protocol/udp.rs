@@ -445,7 +445,7 @@ impl FragAssembler {
     pub fn clear(&mut self) {
         for slot in &mut self.slots {
             if slot.is_some() {
-                std::mem::replace(slot, None).unwrap();
+                slot.take().unwrap();
             }
         }
         self.highest = 0x00;
@@ -460,7 +460,7 @@ impl FragAssembler {
                     let mut result = Vec::with_capacity(127);
                     for slot in &mut self.slots {
                         if slot.is_some() {
-                            result.push(std::mem::replace(slot, None).unwrap());
+                            result.push(slot.take().unwrap());
                         } else {
                             break;
                         }

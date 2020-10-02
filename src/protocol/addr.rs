@@ -1,6 +1,6 @@
 use core::cmp::min;
 use core::convert::TryFrom;
-use core::fmt::{self, Display};
+use core::fmt;
 use core::str::FromStr;
 use std::net::IpAddr;
 
@@ -336,6 +336,12 @@ impl Addr {
     }
 }
 
+impl From<SocketAddr> for Addr {
+    fn from(val: SocketAddr) -> Self {
+        Addr::SocketAddr(val)
+    }
+}
+
 impl TryFrom<&[u8]> for Addr {
     type Error = Error;
 
@@ -385,7 +391,7 @@ impl TryFrom<&[u8]> for Addr {
     }
 }
 
-impl Display for Addr {
+impl fmt::Display for Addr {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             Addr::SocketAddr(addr) => write!(f, "{}", addr),

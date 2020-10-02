@@ -1,6 +1,5 @@
 use core::convert::TryFrom;
-use std::fmt::{Display, Formatter};
-use std::fmt;
+use core::fmt;
 
 use bytes::{Buf, BytesMut};
 
@@ -329,8 +328,8 @@ pub struct CmdRepr {
     pub addr: SocksAddr,
 }
 
-impl Display for CmdRepr {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+impl fmt::Display for CmdRepr {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}({})", self.cmd, self.addr)
     }
 }
@@ -349,15 +348,15 @@ impl CmdRepr {
     }
 
     pub fn is_tcp_bind(&self) -> bool {
-        self.cmd == Cmd::Bind
+        self.cmd.is_tcp_bind()
     }
 
     pub fn is_tcp_connect(&self) -> bool {
-        self.cmd == Cmd::Connect
+        self.cmd.is_tcp_connect()
     }
 
-    pub fn is_udo_associate(&self) -> bool {
-        self.cmd == Cmd::UdpAssociate
+    pub fn is_udp_associate(&self) -> bool {
+        self.cmd.is_udp_associate()
     }
 
     /// Parse a packet and return a high-level representation.

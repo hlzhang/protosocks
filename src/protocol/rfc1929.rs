@@ -1,9 +1,11 @@
 use core::cmp::min;
 use core::convert::TryFrom;
+use core::fmt;
 
 use bytes::{Buf, BytesMut};
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
+use serde::export::Formatter;
 use snafu::Snafu;
 
 use crate::field::Field;
@@ -38,6 +40,16 @@ pub enum Status {
     Success = 0x00,
     #[snafu(display("Failure"))]
     Failure = 0x01,
+}
+
+impl Status {
+    pub fn is_failure(&self) -> bool {
+        self == &Status::Failure
+    }
+
+    pub fn is_success(&self) -> bool {
+        self == &Status::Success
+    }
 }
 
 impl TryFrom<u8> for Status {
@@ -449,7 +461,15 @@ pub struct ReplyRepr {
 
 impl ReplyRepr {
     pub fn new(status: Status) -> Self {
-        ReplyRepr { status }
+        Self { status }
+    }
+
+    pub fn new_failure() -> Self {
+        Self::new(Status::Failure)
+    }
+
+    pub fn new_success() -> Self {
+        Self::new(Status::Success)
     }
 
     /// Parse a packet and return a high-level representation.
@@ -475,6 +495,20 @@ impl ReplyRepr {
     pub fn emit<T: AsRef<[u8]> + AsMut<[u8]>>(&self, packet: &mut ReplyPacket<T>) {
         packet.set_version(Ver::X01.into());
         packet.set_status(self.status as u8);
+    }
+
+    pub fn is_failure(&self) -> bool {
+        self.status.is_failure()
+    }
+
+    pub fn is_success(&self) -> bool {
+        self.status.is_success()
+    }
+}
+
+impl fmt::Display for ReplyRepr {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.status)
     }
 }
 

@@ -151,6 +151,13 @@ pub struct RequestRepr {
 }
 
 impl RequestRepr {
+    pub fn new(methods: Methods) -> Self {
+        Self {
+            ver: Ver::SOCKS5,
+            methods,
+        }
+    }
+
     /// Parse a packet and return a high-level representation.
     pub fn parse<T: AsRef<[u8]> + ?Sized>(packet: &RequestPacket<&T>) -> Result<RequestRepr> {
         // Length of methods must equals to nmethods
@@ -329,6 +336,10 @@ impl ReplyRepr {
         ReplyRepr { method }
     }
 
+    pub fn new_user_pass() -> Self {
+        Self::new(Method::UserPass)
+    }
+
     /// Parse a packet and return a high-level representation.
     pub fn parse<T: AsRef<[u8]> + ?Sized>(packet: &ReplyPacket<&T>) -> Result<ReplyRepr> {
         packet.check_len()?;
@@ -352,6 +363,14 @@ impl ReplyRepr {
     pub fn emit<T: AsRef<[u8]> + AsMut<[u8]>>(&self, packet: &mut ReplyPacket<T>) {
         packet.set_version(Ver::SOCKS5.into());
         packet.set_method(self.method as u8);
+    }
+
+    pub fn is_no_auth(&self) -> bool {
+        return self.method == Method::NoAuth;
+    }
+
+    pub fn is_no_methods(&self) -> bool {
+        return self.method == Method::NoMethods;
     }
 }
 

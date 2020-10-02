@@ -1,6 +1,5 @@
 use core::convert::TryFrom;
 use core::fmt;
-use std::fmt::{Display, Formatter};
 
 use bytes::BytesMut;
 use num_derive::FromPrimitive;
@@ -214,8 +213,22 @@ pub enum Cmd {
     UdpAssociate = 0x03,
 }
 
-impl Display for Cmd {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+impl Cmd {
+    pub fn is_tcp_bind(&self) -> bool {
+        self == &Cmd::Bind
+    }
+
+    pub fn is_tcp_connect(&self) -> bool {
+        self == &Cmd::Connect
+    }
+
+    pub fn is_udp_associate(&self) -> bool {
+        self == &Cmd::UdpAssociate
+    }
+}
+
+impl fmt::Display for Cmd {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Cmd::Connect => write!(f, "Connect"),
             Cmd::Bind => write!(f, "Bind"),
