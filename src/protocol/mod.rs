@@ -161,6 +161,17 @@ pub enum Method {
     NoMethods = 0xFF,
 }
 
+// impl fmt::Display for Method {
+//     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+//         match self {
+//             Method::NoAuth => write!(f, "NoAuth(0x00)"),
+//             Method::GssApi => write!(f, "GssApi(0x01)"),
+//             Method::UserPass => write!(f, "UserPass(0x02)"),
+//             Method::NoMethods => write!(f, "GssApi(0xFF)"),
+//         }
+//     }
+// }
+
 impl Method {
     pub fn try_from_slice(methods: &[u8]) -> Result<Vec<Method>> {
         let mut result = Vec::with_capacity(methods.len());
@@ -340,6 +351,22 @@ pub enum Rep {
     AddrTypeNotSupported = 0x08,
     // X'09' to X'FF' unassigned
 }
+
+// impl fmt::Display for Rep {
+//     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+//         match self {
+//             Rep::Success => write!(f, "Success(0x00)"),
+//             Rep::Failure => write!(f, "Failure(0x01)"),
+//             Rep::RuleFailure => write!(f, "RuleFailure(0x02)"),
+//             Rep::NetworkUnreachable => write!(f, "NetworkUnreachable(0x03)"),
+//             Rep::HostUnreachable => write!(f, "HostUnreachable(0x04)"),
+//             Rep::ConnectionRefused => write!(f, "ConnectionRefused(0x05)"),
+//             Rep::TtlExpired => write!(f, "TtlExpired(0x06)"),
+//             Rep::CommandNotSupported => write!(f, "CommandNotSupported(0x07)"),
+//             Rep::AddrTypeNotSupported => write!(f, "AddrTypeNotSupported(0x08)"),
+//         }
+//     }
+// }
 
 impl TryFrom<u8> for Rep {
     type Error = Error;

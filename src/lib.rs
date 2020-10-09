@@ -44,6 +44,17 @@ pub enum Reply {
     Bytes(Bytes),
 }
 
+impl fmt::Display for Reply {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Reply::Method(val) => write!(f, "Reply::Method({})", val),
+            Reply::Auth(val) => write!(f, "Reply::Auth({})", val),
+            Reply::Rep(val) => write!(f, "Reply::Rep({})", val),
+            Reply::Bytes(val) => write!(f, "Reply::Bytes({} bytes)", val.len()),
+        }
+    }
+}
+
 impl From<MethodRepr> for Reply {
     fn from(val: MethodRepr) -> Self {
         Reply::Method(val)

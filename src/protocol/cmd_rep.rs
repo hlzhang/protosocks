@@ -480,6 +480,12 @@ impl RepRepr {
     }
 }
 
+impl fmt::Display for RepRepr {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}({})", self.rep, self.addr)
+    }
+}
+
 impl Decoder<RepRepr> for RepRepr {
     fn decode(src: &mut BytesMut) -> Result<Option<Self>> {
         let pkt = Packet::new_unchecked(src.as_ref());

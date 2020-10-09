@@ -381,6 +381,12 @@ impl ReplyRepr {
     }
 }
 
+impl fmt::Display for ReplyRepr {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "SOCKS5 MethodSelection({})", self.method)
+    }
+}
+
 impl Decoder<ReplyRepr> for ReplyRepr {
     fn decode(src: &mut BytesMut) -> Result<Option<Self>> {
         let pkt = ReplyPacket::new_unchecked(src.as_ref());
