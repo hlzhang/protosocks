@@ -1,4 +1,5 @@
 use core::convert::TryFrom;
+use core::fmt;
 
 use bytes::{Buf, BytesMut};
 
@@ -189,6 +190,12 @@ impl RequestRepr {
     pub fn emit<T: AsRef<[u8]> + AsMut<[u8]>>(&self, packet: &mut RequestPacket<T>) {
         packet.set_version(Ver::SOCKS5.into());
         packet.set_methods(&self.methods);
+    }
+}
+
+impl fmt::Display for RequestRepr {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "SOCKS5 MethodSelection({:?})", self.methods)
     }
 }
 

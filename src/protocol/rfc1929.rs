@@ -332,6 +332,12 @@ impl RequestRepr {
     }
 }
 
+impl fmt::Display for RequestRepr {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "SOCKS5 UserPassAuth(ulen: {}, plen: {})", self.uname.len(), self.passwd.len())
+    }
+}
+
 impl Decoder<RequestRepr> for RequestRepr {
     fn decode(src: &mut BytesMut) -> Result<Option<Self>> {
         let pkt = RequestPacket::new_unchecked(src.as_ref());

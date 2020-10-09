@@ -121,6 +121,17 @@ pub enum Request {
     Bytes(Bytes),
 }
 
+impl fmt::Display for Request {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Request::Methods(val) => write!(f, "Request::Methods({})", val),
+            Request::Auth(val) => write!(f, "Request::Auth({})", val),
+            Request::Cmd(val) => write!(f, "Request::Cmd({})", val),
+            Request::Bytes(val) => write!(f, "Request::Bytes({} bytes)", val.len()),
+        }
+    }
+}
+
 impl From<MethodsRepr> for Request {
     fn from(val: MethodsRepr) -> Self {
         Request::Methods(val)
