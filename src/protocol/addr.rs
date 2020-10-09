@@ -4,7 +4,6 @@ use core::fmt;
 use core::str::FromStr;
 use std::net::IpAddr;
 
-use serde::export::Formatter;
 #[cfg(all(feature = "dns", feature = "std"))]
 use trust_dns_client::{
     client::{Client, SyncClient},
@@ -392,7 +391,7 @@ impl TryFrom<&[u8]> for Addr {
 }
 
 impl fmt::Display for Addr {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Addr::SocketAddr(addr) => write!(f, "{}", addr),
             Addr::DomainPort(domain, port) => write!(f, "{}:{}", domain, port),

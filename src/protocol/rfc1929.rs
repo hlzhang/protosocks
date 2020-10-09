@@ -5,7 +5,6 @@ use core::fmt;
 use bytes::{Buf, BytesMut};
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
-use serde::export::Formatter;
 use snafu::Snafu;
 
 use crate::field::Field;
@@ -513,7 +512,7 @@ impl ReplyRepr {
 }
 
 impl fmt::Display for ReplyRepr {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.status)
     }
 }
