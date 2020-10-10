@@ -9,7 +9,7 @@ use snafu::Snafu;
 
 use crate::field::Field;
 
-use super::{Decoder, Encodable, Encoder, Error, field, Result};
+use super::{Decoder, Encodable, Encoder, Error, field, CrateResult};
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, FromPrimitive, Hash, PartialEq, Serialize, Snafu)]
 #[repr(u8)]
@@ -21,7 +21,7 @@ pub enum Ver {
 impl TryFrom<u8> for Ver {
     type Error = Error;
 
-    fn try_from(val: u8) -> Result<Self> {
+    fn try_from(val: u8) -> CrateResult<Self> {
         FromPrimitive::from_u8(val).ok_or(Error::Malformed)
     }
 }
@@ -54,7 +54,7 @@ impl Status {
 impl TryFrom<u8> for Status {
     type Error = Error;
 
-    fn try_from(val: u8) -> Result<Self> {
+    fn try_from(val: u8) -> CrateResult<Self> {
         FromPrimitive::from_u8(val).ok_or(Error::Malformed)
     }
 }
@@ -96,7 +96,7 @@ impl<T: AsRef<[u8]>> RequestPacket<T> {
     ///
     /// [new_unchecked]: #method.new_unchecked
     /// [check_len]: #method.check_len
-    pub fn new_checked(buffer: T) -> Result<RequestPacket<T>> {
+    pub fn new_checked(buffer: T) -> CrateResult<RequestPacket<T>> {
         let packet = Self::new_unchecked(buffer);
         packet.check_len()?;
         Ok(packet)
@@ -109,7 +109,7 @@ impl<T: AsRef<[u8]>> RequestPacket<T> {
     ///
     /// [set_methods]: #method.set_uname
     /// [set_methods]: #method.set_passwd
-    pub fn check_len(&self) -> Result<()> {
+    pub fn check_len(&self) -> CrateResult<()> {
         let len = self.buffer.as_ref().len();
 
         if len <= field::UNAME_PLEN_PASSWD.start {
@@ -301,7 +301,7 @@ impl RequestRepr {
     }
 
     /// Parse a packet and return a high-level representation.
-    pub fn parse<T: AsRef<[u8]> + ?Sized>(packet: &RequestPacket<&T>) -> Result<RequestRepr> {
+    pub fn parse<T: AsRef<[u8]> + ?Sized>(packet: &RequestPacket<&T>) -> CrateResult<RequestRepr> {
         packet.check_len()?;
 
         // Version 5 is expected.
@@ -338,7 +338,7 @@ impl fmt::Display for RequestRepr {
 }
 
 impl Decoder<RequestRepr> for RequestRepr {
-    fn decode(src: &mut BytesMut) -> Result<Option<Self>> {
+    fn decode(src: &mut BytesMut) -> CrateResult<Option<Self>> {
         let pkt = RequestPacket::new_unchecked(src.as_ref());
         match RequestRepr::parse(&pkt) {
             Ok(repr) => {
@@ -382,7 +382,7 @@ impl<T: AsRef<[u8]>> ReplyPacket<T> {
     ///
     /// [new_unchecked]: #method.new_unchecked
     /// [check_len]: #method.check_len
-    pub fn new_checked(buffer: T) -> Result<ReplyPacket<T>> {
+    pub fn new_checked(buffer: T) -> CrateResult<ReplyPacket<T>> {
         let packet = Self::new_unchecked(buffer);
         packet.check_len()?;
         Ok(packet)
@@ -390,7 +390,7 @@ impl<T: AsRef<[u8]>> ReplyPacket<T> {
 
     /// Ensure that no accessor method will panic if called.
     /// Returns `Err(Error::Truncated)` if the buffer is too short.
-    pub fn check_len(&self) -> Result<()> {
+    pub fn check_len(&self) -> CrateResult<()> {
         match self.buffer.as_ref().len() {
             l if l < self.total_len() => Err(Error::Truncated),
             l if l > self.total_len() => Err(Error::Malformed),
@@ -478,7 +478,7 @@ impl ReplyRepr {
     }
 
     /// Parse a packet and return a high-level representation.
-    pub fn parse<T: AsRef<[u8]> + ?Sized>(packet: &ReplyPacket<&T>) -> Result<ReplyRepr> {
+    pub fn parse<T: AsRef<[u8]> + ?Sized>(packet: &ReplyPacket<&T>) -> CrateResult<ReplyRepr> {
         packet.check_len()?;
 
         // Version 5 is expected.
@@ -518,7 +518,7 @@ impl fmt::Display for ReplyRepr {
 }
 
 impl Decoder<ReplyRepr> for ReplyRepr {
-    fn decode(src: &mut BytesMut) -> Result<Option<Self>> {
+    fn decode(src: &mut BytesMut) -> CrateResult<Option<Self>> {
         let pkt = ReplyPacket::new_unchecked(src.as_ref());
         match ReplyRepr::parse(&pkt) {
             Ok(repr) => {

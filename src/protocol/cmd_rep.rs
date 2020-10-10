@@ -3,7 +3,7 @@ use core::fmt;
 
 use bytes::{Buf, BytesMut};
 
-use super::{Cmd, Decoder, Encodable, Encoder, Error, field, HasAddr, Rep, Result, SocksAddr, Ver};
+use super::{Cmd, Decoder, Encodable, Encoder, Error, field, HasAddr, Rep, CrateResult, SocksAddr, Ver};
 use super::addr::field_port;
 
 // Requests
@@ -151,7 +151,7 @@ impl<T: AsRef<[u8]>> Packet<T> {
     ///
     /// [new_unchecked]: #method.new_unchecked
     /// [check_len]: #method.check_len
-    pub fn new_checked(buffer: T) -> Result<Packet<T>> {
+    pub fn new_checked(buffer: T) -> CrateResult<Packet<T>> {
         let packet = Self::new_unchecked(buffer);
         packet.check_len()?;
         Ok(packet)
@@ -164,7 +164,7 @@ impl<T: AsRef<[u8]>> Packet<T> {
         }
     }
 
-    pub fn new_compact_checked(buffer: T) -> Result<Packet<T>> {
+    pub fn new_compact_checked(buffer: T) -> CrateResult<Packet<T>> {
         let packet = Self::new_compact_unchecked(buffer);
         packet.check_len()?;
         Ok(packet)
@@ -182,7 +182,7 @@ impl<T: AsRef<[u8]>> Packet<T> {
     ///
     /// [set_methods]: #method.set_socks_addr
     #[inline]
-    pub fn check_len(&self) -> Result<()> {
+    pub fn check_len(&self) -> CrateResult<()> {
         self.addr.check_addr_len()?;
         if self.buffer_ref().len() > self.total_len() {
             Err(Error::Malformed)
@@ -360,7 +360,7 @@ impl CmdRepr {
     }
 
     /// Parse a packet and return a high-level representation.
-    pub fn parse<T: AsRef<[u8]> + ?Sized>(packet: &Packet<&T>) -> Result<CmdRepr> {
+    pub fn parse<T: AsRef<[u8]> + ?Sized>(packet: &Packet<&T>) -> CrateResult<CmdRepr> {
         packet.check_len()?;
 
         // Version 5 is expected.
@@ -399,7 +399,7 @@ impl CmdRepr {
 }
 
 impl Decoder<CmdRepr> for CmdRepr {
-    fn decode(src: &mut BytesMut) -> Result<Option<Self>> {
+    fn decode(src: &mut BytesMut) -> CrateResult<Option<Self>> {
         let pkt = Packet::new_unchecked(src.as_ref());
         match CmdRepr::parse(&pkt) {
             Ok(repr) => {
@@ -449,7 +449,7 @@ impl RepRepr {
     }
 
     /// Parse a packet and return a high-level representation.
-    pub fn parse<T: AsRef<[u8]> + ?Sized>(packet: &Packet<&T>) -> Result<RepRepr> {
+    pub fn parse<T: AsRef<[u8]> + ?Sized>(packet: &Packet<&T>) -> CrateResult<RepRepr> {
         packet.check_len()?;
 
         // Version 5 is expected.
@@ -487,7 +487,7 @@ impl fmt::Display for RepRepr {
 }
 
 impl Decoder<RepRepr> for RepRepr {
-    fn decode(src: &mut BytesMut) -> Result<Option<Self>> {
+    fn decode(src: &mut BytesMut) -> CrateResult<Option<Self>> {
         let pkt = Packet::new_unchecked(src.as_ref());
         match RepRepr::parse(&pkt) {
             Ok(repr) => {

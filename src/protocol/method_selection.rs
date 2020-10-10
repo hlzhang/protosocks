@@ -3,7 +3,7 @@ use core::fmt;
 
 use bytes::{Buf, BytesMut};
 
-use super::{Decoder, Encodable, Encoder, Error, field, Method, Result, ToU8Vec, Ver};
+use super::{Decoder, Encodable, Encoder, Error, field, Method, CrateResult, ToU8Vec, Ver};
 
 pub type Methods = Vec<Method>;
 
@@ -22,7 +22,7 @@ impl<T: AsRef<[u8]>> RequestPacket<T> {
     ///
     /// [new_unchecked]: #method.new_unchecked
     /// [check_len]: #method.check_len
-    pub fn new_checked(buffer: T) -> Result<RequestPacket<T>> {
+    pub fn new_checked(buffer: T) -> CrateResult<RequestPacket<T>> {
         let packet = Self::new_unchecked(buffer);
         packet.check_len()?;
         Ok(packet)
@@ -34,7 +34,7 @@ impl<T: AsRef<[u8]>> RequestPacket<T> {
     /// The result of this check is invalidated by calling [set_methods]
     ///
     /// [set_methods]: #method.set_methods
-    pub fn check_len(&self) -> Result<()> {
+    pub fn check_len(&self) -> CrateResult<()> {
         let len = self.buffer.as_ref().len();
 
         if len < field::METHODS.start || len < self.total_len() {
@@ -68,7 +68,7 @@ impl<T: AsRef<[u8]>> RequestPacket<T> {
 
     /// Return the methods.
     #[inline]
-    pub fn parse_methods(&self) -> Result<Methods> {
+    pub fn parse_methods(&self) -> CrateResult<Methods> {
         let data = self.buffer.as_ref();
         let methods = &data[field::methods(self.nmethods())];
         Method::try_from_slice(methods)
@@ -160,7 +160,7 @@ impl RequestRepr {
     }
 
     /// Parse a packet and return a high-level representation.
-    pub fn parse<T: AsRef<[u8]> + ?Sized>(packet: &RequestPacket<&T>) -> Result<RequestRepr> {
+    pub fn parse<T: AsRef<[u8]> + ?Sized>(packet: &RequestPacket<&T>) -> CrateResult<RequestRepr> {
         // Length of methods must equals to nmethods
         packet.check_len()?;
 
@@ -200,7 +200,7 @@ impl fmt::Display for RequestRepr {
 }
 
 impl Decoder<RequestRepr> for RequestRepr {
-    fn decode(src: &mut BytesMut) -> Result<Option<Self>> {
+    fn decode(src: &mut BytesMut) -> CrateResult<Option<Self>> {
         let pkt = RequestPacket::new_unchecked(src.as_ref());
         match RequestRepr::parse(&pkt) {
             Ok(repr) => {
@@ -244,7 +244,7 @@ impl<T: AsRef<[u8]>> ReplyPacket<T> {
     ///
     /// [new_unchecked]: #method.new_unchecked
     /// [check_len]: #method.check_len
-    pub fn new_checked(buffer: T) -> Result<ReplyPacket<T>> {
+    pub fn new_checked(buffer: T) -> CrateResult<ReplyPacket<T>> {
         let packet = Self::new_unchecked(buffer);
         packet.check_len()?;
         Ok(packet)
@@ -252,7 +252,7 @@ impl<T: AsRef<[u8]>> ReplyPacket<T> {
 
     /// Ensure that no accessor method will panic if called.
     /// Returns `Err(Error::Truncated)` if the buffer is too short.
-    pub fn check_len(&self) -> Result<()> {
+    pub fn check_len(&self) -> CrateResult<()> {
         match self.buffer.as_ref().len() {
             l if l < self.total_len() => Err(Error::Truncated),
             l if l > self.total_len() => Err(Error::Malformed),
@@ -348,7 +348,7 @@ impl ReplyRepr {
     }
 
     /// Parse a packet and return a high-level representation.
-    pub fn parse<T: AsRef<[u8]> + ?Sized>(packet: &ReplyPacket<&T>) -> Result<ReplyRepr> {
+    pub fn parse<T: AsRef<[u8]> + ?Sized>(packet: &ReplyPacket<&T>) -> CrateResult<ReplyRepr> {
         packet.check_len()?;
 
         // Version 5 is expected.
@@ -388,7 +388,7 @@ impl fmt::Display for ReplyRepr {
 }
 
 impl Decoder<ReplyRepr> for ReplyRepr {
-    fn decode(src: &mut BytesMut) -> Result<Option<Self>> {
+    fn decode(src: &mut BytesMut) -> CrateResult<Option<Self>> {
         let pkt = ReplyPacket::new_unchecked(src.as_ref());
         match ReplyRepr::parse(&pkt) {
             Ok(repr) => {

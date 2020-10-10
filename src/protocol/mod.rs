@@ -6,7 +6,7 @@ use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
 use snafu::Snafu;
 
-pub use addr::{Addr as SocksAddr, HasAddr};
+pub use addr::{Addr as SocksAddr, HasAddr, resolve, resolve_async};
 pub use cmd_rep::{CmdRepr, Packet as CmdPacket, Packet as RepPacket, RepRepr};
 pub use method_selection::{
     ReplyPacket as MethodPacket, ReplyRepr as MethodRepr, RequestPacket as MethodsPacket,
@@ -57,7 +57,7 @@ impl From<smolsocket::Error> for Error {
 }
 
 // pub(crate) type OptionResult<T> = core::result::Result<Option<T>, Error>;
-pub(crate) type Result<T> = core::result::Result<T, Error>;
+pub(crate) type CrateResult<T> = core::result::Result<T, Error>;
 
 mod field {
     use crate::field::*;
@@ -121,7 +121,7 @@ pub enum Ver {
 impl TryFrom<u8> for Ver {
     type Error = Error;
 
-    fn try_from(val: u8) -> Result<Self> {
+    fn try_from(val: u8) -> CrateResult<Self> {
         FromPrimitive::from_u8(val).ok_or(Error::Malformed)
     }
 }
@@ -173,7 +173,7 @@ pub enum Method {
 // }
 
 impl Method {
-    pub fn try_from_slice(methods: &[u8]) -> Result<Vec<Method>> {
+    pub fn try_from_slice(methods: &[u8]) -> CrateResult<Vec<Method>> {
         let mut result = Vec::with_capacity(methods.len());
         for var in methods {
             result.push(Method::try_from(*var)?);
@@ -185,7 +185,7 @@ impl Method {
 impl TryFrom<u8> for Method {
     type Error = Error;
 
-    fn try_from(val: u8) -> Result<Self> {
+    fn try_from(val: u8) -> CrateResult<Self> {
         FromPrimitive::from_u8(val).ok_or(Error::Malformed)
     }
 }
@@ -251,7 +251,7 @@ impl fmt::Display for Cmd {
 impl TryFrom<u8> for Cmd {
     type Error = Error;
 
-    fn try_from(val: u8) -> Result<Self> {
+    fn try_from(val: u8) -> CrateResult<Self> {
         FromPrimitive::from_u8(val).ok_or(Error::Malformed)
     }
 }
@@ -290,7 +290,7 @@ pub enum Atyp {
 impl TryFrom<u8> for Atyp {
     type Error = Error;
 
-    fn try_from(val: u8) -> Result<Self> {
+    fn try_from(val: u8) -> CrateResult<Self> {
         FromPrimitive::from_u8(val).ok_or(Error::Malformed)
     }
 }
@@ -371,7 +371,7 @@ pub enum Rep {
 impl TryFrom<u8> for Rep {
     type Error = Error;
 
-    fn try_from(val: u8) -> Result<Self> {
+    fn try_from(val: u8) -> CrateResult<Self> {
         FromPrimitive::from_u8(val).ok_or(Error::Malformed)
     }
 }
@@ -391,5 +391,5 @@ pub trait Encoder<Item> {
 }
 
 pub trait Decoder<Item> {
-    fn decode(src: &mut BytesMut) -> Result<Option<Item>>;
+    fn decode(src: &mut BytesMut) -> CrateResult<Option<Item>>;
 }

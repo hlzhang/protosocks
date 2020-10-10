@@ -4,19 +4,28 @@ use core::fmt;
 use core::str::FromStr;
 use std::net::IpAddr;
 
+#[cfg(all(feature = "dns", feature = "rt_tokio", feature = "std"))]
+use futures::prelude::*;
 #[cfg(all(feature = "dns", feature = "std"))]
 use trust_dns_client::{
-    client::{Client, SyncClient},
+    client::{Client, ClientHandle, SyncClient},
+    error::ClientResult,
     op::DnsResponse,
     rr::{DNSClass, Name, RData, Record, RecordType},
     udp::UdpClientConnection,
+};
+#[cfg(all(feature = "dns", feature = "rt_tokio", feature = "std"))]
+use trust_dns_client::{
+    client::AsyncClient,
+    proto::error::ProtoError,
+    udp::UdpClientStream,
 };
 
 use smolsocket::{port_from_bytes, port_to_bytes, SocketAddr};
 
 use crate::field::Field;
 
-use super::{Atyp, Error, Result};
+use super::{Atyp, CrateResult, Error};
 
 /// includes length of domain if addr is domain:port
 #[inline]
@@ -44,25 +53,55 @@ pub(crate) fn field_socks_addr(start: usize, addr_len: usize) -> Field {
     field_addr(start + 1, addr_len).start - 1..field_port(start + 1, addr_len).end
 }
 
-/// nameserver e.g. 8.8.8.8:53
 #[cfg(all(feature = "dns", feature = "std"))]
-pub fn resolve(domain: &str, nameserver: &str) -> Result<Option<std::net::IpAddr>> {
-    let address = nameserver.parse()
-        .map_err(|_| Error::AddrParseError)?;
-    let conn = UdpClientConnection::new(address)
-        .map_err(|_| Error::AddrParseError)?;
-    let client = SyncClient::new(conn); // TODO support async client
-    let name = Name::from_str((domain.to_owned() + ".").as_str())
-        .map_err(|_| Error::AddrParseError)?;
-    let response: DnsResponse = client.query(&name, DNSClass::IN, RecordType::A)
-        .map_err(|_| Error::AddrParseError)?;
+fn to_name(domain: &str) -> CrateResult<Name> {
+    Ok(Name::from_str((domain.to_owned() + ".").as_str()).map_err(|_| Error::AddrParseError)?)
+}
 
+#[cfg(all(feature = "dns", feature = "std"))]
+pub fn dns_response_to_ip(response: ClientResult<DnsResponse>) -> CrateResult<Option<::std::net::IpAddr>> {
+    let response = response.map_err(|_| Error::AddrParseError)?;
     let answers: &[Record] = response.answers();
-    Ok(if let &RData::A(ref ip) = answers[0].rdata() {
-        Some(IpAddr::V4(ip.clone()))
+    Ok(if answers.len() > 0 {
+        if let &RData::A(ref ip) = answers[0].rdata() {
+            Some(IpAddr::V4(ip.clone()))
+        } else {
+            None
+        }
     } else {
         None
     })
+}
+
+/// Dont use this in a context of Tokio because of it attempts to block the current thread
+/// while the thread is being used to drive asynchronous tasks.
+#[cfg(all(feature = "dns", feature = "std"))]
+pub fn resolve(domain: &str, nameserver: &str) -> CrateResult<Option<::std::net::IpAddr>> {
+    let address = nameserver.parse().map_err(|_| Error::AddrParseError)?;
+    let name = to_name(domain)?;
+
+    let conn = UdpClientConnection::new(address)
+        .map_err(|_| Error::AddrParseError)?;
+    let client = SyncClient::new(conn); // TODO support async client
+    let response = client.query(&name, DNSClass::IN, RecordType::A);
+    dns_response_to_ip(response)
+}
+
+#[cfg(all(feature = "dns", feature = "rt_tokio", feature = "std"))]
+pub async fn resolve_async(domain: &str, nameserver: &str) -> CrateResult<Option<::std::net::IpAddr>> {
+    let address = nameserver.parse().map_err(|_| Error::AddrParseError)?;
+    let name = to_name(domain)?;
+    let stream = UdpClientStream::<tokio::net::UdpSocket>::new(address);
+    let (mut client, task) = AsyncClient::connect(stream).await
+        .map_err(|_| Error::AddrParseError)?;
+
+    let (abort_handle, abort_registration) = future::AbortHandle::new_pair();
+    let task = future::Abortable::new(task, abort_registration);
+    let _jh: tokio::task::JoinHandle<Result<Result<(), ProtoError>, future::Aborted>> = tokio::spawn(task);
+
+    let response = client.query(name, DNSClass::IN, RecordType::A).await;
+    abort_handle.abort();
+    dns_response_to_ip(response)
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -81,7 +120,7 @@ impl<T: AsRef<[u8]>> HasAddr<T> {
     ///
     /// [new_unchecked]: #method.new_unchecked
     /// [check_addr_len]: #method.check_addr_len
-    pub fn new_checked(field_atyp: usize, buffer: T) -> Result<HasAddr<T>> {
+    pub fn new_checked(field_atyp: usize, buffer: T) -> CrateResult<HasAddr<T>> {
         let packet = Self::new_unchecked(field_atyp, buffer);
         packet.check_addr_len()?;
         Ok(packet)
@@ -145,13 +184,13 @@ impl<T: AsRef<[u8]>> HasAddr<T> {
 
     /// Return the atyp.
     #[inline]
-    pub fn parse_atyp(&self) -> Result<Atyp> {
+    pub fn parse_atyp(&self) -> CrateResult<Atyp> {
         Atyp::try_from(self.atyp())
     }
 
     /// Check the length of socks addr.
     #[inline]
-    pub fn check_addr_len(&self) -> Result<()> {
+    pub fn check_addr_len(&self) -> CrateResult<()> {
         let len = self.buffer.as_ref().len();
         if len < self.field_addr_start() {
             return Err(Error::Truncated);
@@ -319,7 +358,7 @@ impl Addr {
 
     /// nameserver e.g. 8.8.8.8:53
     #[cfg(all(feature = "dns", feature = "std"))]
-    pub fn resolve(&self, nameserver: &str) -> Result<Option<SocketAddr>> {
+    pub fn resolve(&self, nameserver: &str) -> CrateResult<Option<SocketAddr>> {
         Ok(match self {
             #[cfg(any(feature = "proto-ipv4", feature = "proto-ipv6"))]
             Addr::SocketAddr(socket_addr) => Some(socket_addr.clone()),
@@ -344,7 +383,7 @@ impl From<SocketAddr> for Addr {
 impl TryFrom<&[u8]> for Addr {
     type Error = Error;
 
-    fn try_from(value: &[u8]) -> Result<Self> {
+    fn try_from(value: &[u8]) -> CrateResult<Self> {
         let len = value.len();
         if len < 3 {
             Err(Error::Truncated)
@@ -656,13 +695,17 @@ mod tests {
         assert_eq!(parsed.to_vec(), socks_addr.to_vec());
     }
 
-    #[cfg(all(feature = "dns", feature = "std"))]
-    #[test]
-    fn test_socks_addr_domain_resolve() {
+    fn init_logger() {
         if env::var("RUST_LOG").is_err() {
             env::set_var("RUST_LOG", "debug");
         }
         let _ = pretty_env_logger::try_init_timed();
+    }
+
+    #[cfg(all(feature = "dns", feature = "std"))]
+    #[test]
+    fn test_socks_addr_domain_resolve() {
+        init_logger();
 
         let socks_addr = Addr::DomainPort("bing.com".to_string(), 443);
         let resolved = socks_addr.resolve("8.8.8.8:53");
@@ -672,6 +715,16 @@ mod tests {
         assert!(option.is_some());
         let socket_addr = option.unwrap();
         assert_eq!(socket_addr.len(), 6);
+    }
+
+    #[cfg(all(feature = "dns", feature = "rt_tokio", feature = "std"))]
+    #[tokio::test]
+    async fn test_resolve_async() {
+        init_logger();
+
+        let result = resolve_async("google.com", "8.8.8.8:53").await;
+        info!("result {:?}", result);
+        assert!(result.is_ok());
     }
 
     #[test]

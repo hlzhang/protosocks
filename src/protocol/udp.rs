@@ -9,7 +9,7 @@ use smolsocket::port_from_bytes;
 use crate::field::Field;
 
 use super::{
-    addr::field_port, Decoder, Encodable, Encoder, Error, field, HasAddr, Result, SocksAddr,
+    addr::field_port, Decoder, Encodable, Encoder, Error, field, HasAddr, CrateResult, SocksAddr,
 };
 
 //
@@ -82,7 +82,7 @@ impl<T: AsRef<[u8]>> Packet<T> {
     ///
     /// [new_unchecked]: #method.new_unchecked
     /// [check_len]: #method.check_len
-    pub fn new_checked(buffer: T) -> Result<Packet<T>> {
+    pub fn new_checked(buffer: T) -> CrateResult<Packet<T>> {
         let packet = Self::new_unchecked(buffer);
         packet.check_header_len()?;
         Ok(packet)
@@ -98,7 +98,7 @@ impl<T: AsRef<[u8]>> Packet<T> {
     /// The result of this check is invalidated by calling [set_socks_addr]
     ///
     /// [set_methods]: #method.set_socks_addr
-    pub fn check_header_len(&self) -> Result<()> {
+    pub fn check_header_len(&self) -> CrateResult<()> {
         self.0.check_addr_len()
     }
 
@@ -243,7 +243,7 @@ pub struct Repr {
 
 impl Repr {
     /// Parse a packet and return a high-level representation.
-    pub fn parse<T: AsRef<[u8]> + ?Sized>(packet: &Packet<&T>) -> Result<Repr> {
+    pub fn parse<T: AsRef<[u8]> + ?Sized>(packet: &Packet<&T>) -> CrateResult<Repr> {
         packet.check_header_len()?;
 
         if packet.rsv() != 0 as u16 {
@@ -350,7 +350,7 @@ impl Frag {
     }
 
     /// Parse a packet and return a high-level representation.
-    pub fn parse<T: AsRef<[u8]> + ?Sized>(packet: &Packet<&T>) -> Result<Frag> {
+    pub fn parse<T: AsRef<[u8]> + ?Sized>(packet: &Packet<&T>) -> CrateResult<Frag> {
         packet.check_header_len()?;
 
         if packet.rsv() != 0 as u16 {
@@ -391,7 +391,7 @@ impl Frag {
 }
 
 impl Decoder<Frag> for Frag {
-    fn decode(src: &mut BytesMut) -> Result<Option<Self>> {
+    fn decode(src: &mut BytesMut) -> CrateResult<Option<Self>> {
         let pkt = Packet::new_unchecked(src.as_ref());
         match Frag::parse(&pkt) {
             Ok(frag) => {

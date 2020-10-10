@@ -9,9 +9,10 @@ use core::fmt;
 use bytes::{Bytes, BytesMut};
 
 pub use protocol::{
-    Atyp, AuthReplyPacket, AuthReplyRepr, Cmd, CmdPacket, CmdRepr, Decoder as ProtocolDecoder,
-    Encoder as ProtocolEncoder, Error as ProtocolError, HasAddr, Method, MethodPacket, MethodRepr,
-    MethodsPacket, MethodsRepr, Rep, RepPacket, RepRepr, Rfc1929Ver, SocksAddr, Status, UdpFrag,
+    Atyp, AuthReplyPacket,
+    AuthReplyRepr, Cmd, CmdPacket, CmdRepr, Decoder as ProtocolDecoder, Encoder as ProtocolEncoder, Error as ProtocolError,
+    HasAddr, Method, MethodPacket, MethodRepr, MethodsPacket, MethodsRepr,
+    Rep, RepPacket, RepRepr, resolve, resolve_async, Rfc1929Ver, SocksAddr, Status, UdpFrag,
     UdpFragAssembler, UdpPacket, UdpRepr, UserPassPacket, UserPassRepr, Ver,
 };
 

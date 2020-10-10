@@ -19,6 +19,7 @@ exclude = [
 
 [dependencies]
 bytes = "0.5"
+futures = { version = "0.3.0", optional = true }
 log = "0.4"
 num-traits = "0.2"
 num-derive = "0.3"
@@ -38,7 +39,7 @@ pretty_env_logger = "0.3"
 
 [features]
 dns = ["trust-dns-client"]
-rt_tokio = ["tokio", "tokio-util"]
+rt_tokio = ["futures", "tokio", "tokio-util"]
 std = ["smolsocket/std", "smoltcp/std"]
 "proto-ipv4" = ["smolsocket/proto-ipv4", "smoltcp/proto-ipv4"]
 "proto-ipv6" = ["smolsocket/proto-ipv6", "smoltcp/proto-ipv4"]
