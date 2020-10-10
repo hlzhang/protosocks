@@ -12,7 +12,7 @@ use trust_dns_client::{
 #[cfg(all(feature = "rt_tokio"))]
 use trust_dns_client::{
     client::AsyncClient,
-    proto::error::ProtoError,
+    proto::{error::ProtoError, udp::UdpResponse},
     udp::UdpClientStream,
 };
 
@@ -20,23 +20,7 @@ use smolsocket::SocketAddr;
 
 use super::{CrateResult, Error, SocksAddr};
 
-fn parse_addr(nameserver: &str) -> CrateResult<::std::net::SocketAddr> {
-    Ok(nameserver.parse().map_err(|_| Error::DnsError(None))?)
-}
-
-fn to_name(domain: &str) -> CrateResult<Name> {
-    Ok(Name::from_str((domain.to_owned() + ".").as_str()).map_err(|_| Error::AddrError)?)
-}
-
-fn new_sync_client(nameserver: &str) -> CrateResult<SyncClient<UdpClientConnection>> {
-    let address = parse_addr(nameserver)?;
-    let conn = UdpClientConnection::new(address)
-        .map_err(|_| Error::DnsError(None))?;
-    let client = SyncClient::new(conn);
-    Ok(client)
-}
-
-pub fn dns_response_to_ip(response: ClientResult<DnsResponse>) -> CrateResult<Option<::std::net::IpAddr>> {
+fn dns_response_to_ip(response: ClientResult<DnsResponse>) -> CrateResult<Option<::std::net::IpAddr>> {
     let response = response.map_err(|_| Error::DnsError(None))?;
     let answers: &[Record] = response.answers();
     Ok(if answers.len() > 0 {
@@ -50,6 +34,43 @@ pub fn dns_response_to_ip(response: ClientResult<DnsResponse>) -> CrateResult<Op
     })
 }
 
+fn dns_response_to_ip2(domain: &str, response: ClientResult<DnsResponse>) ->CrateResult<::std::net::IpAddr> {
+    if let Ok(resolved) = dns_response_to_ip(response) {
+        if let Some(ip) = resolved {
+            Ok(ip)
+        } else {
+            Err(Error::DnsError(Some(domain.to_string())))
+        }
+    } else {
+        Err(Error::DnsError(Some(domain.to_string())))
+    }
+}
+
+#[cfg(all(feature = "rt_tokio"))]
+async fn new_async_client(nameserver: &str) -> CrateResult<(AsyncClient<UdpResponse>, future::AbortHandle)> {
+    let address = parse_addr(nameserver)?;
+    let stream = UdpClientStream::<tokio::net::UdpSocket>::new(address);
+    let (client, task) = AsyncClient::connect(stream).await
+        .map_err(|_| Error::DnsError(None))?;
+
+    let (abort_handle, abort_registration) = future::AbortHandle::new_pair();
+    let task = future::Abortable::new(task, abort_registration);
+    let _jh: tokio::task::JoinHandle<Result<Result<(), ProtoError>, future::Aborted>> = tokio::spawn(task);
+    Ok((client, abort_handle))
+}
+
+fn new_sync_client(nameserver: &str) -> CrateResult<SyncClient<UdpClientConnection>> {
+    let address = parse_addr(nameserver)?;
+    let conn = UdpClientConnection::new(address)
+        .map_err(|_| Error::DnsError(None))?;
+    let client = SyncClient::new(conn);
+    Ok(client)
+}
+
+fn parse_addr(nameserver: &str) -> CrateResult<::std::net::SocketAddr> {
+    Ok(nameserver.parse().map_err(|_| Error::DnsError(None))?)
+}
+
 pub fn resolve_addr(addr: &SocksAddr, nameserver: &str) -> CrateResult<SocketAddr> {
     let resolver = crate::DnsResolver::new(nameserver, None)?;
     resolver.try_resolve_addr(addr)
@@ -57,20 +78,84 @@ pub fn resolve_addr(addr: &SocksAddr, nameserver: &str) -> CrateResult<SocketAdd
 
 #[cfg(all(feature = "rt_tokio"))]
 pub async fn resolve_domain_async(domain: &str, nameserver: &str) -> CrateResult<Option<::std::net::IpAddr>> {
-    let address = parse_addr(nameserver)?;
+    let (mut client, ah) = new_async_client(nameserver).await?;
     let name = to_name(domain)?;
-
-    let stream = UdpClientStream::<tokio::net::UdpSocket>::new(address);
-    let (mut client, task) = AsyncClient::connect(stream).await
-        .map_err(|_| Error::DnsError(None))?;
-
-    let (abort_handle, abort_registration) = future::AbortHandle::new_pair();
-    let task = future::Abortable::new(task, abort_registration);
-    let _jh: tokio::task::JoinHandle<Result<Result<(), ProtoError>, future::Aborted>> = tokio::spawn(task);
-
     let response = client.query(name, DNSClass::IN, RecordType::A).await;
-    abort_handle.abort();
+    ah.abort();
     dns_response_to_ip(response)
+}
+
+fn to_name(domain: &str) -> CrateResult<Name> {
+    Ok(Name::from_str((domain.to_owned() + ".").as_str()).map_err(|_| Error::AddrError)?)
+}
+
+#[cfg(all(feature = "rt_tokio"))]
+pub struct AsyncDnsResolver {
+    primary_client: (AsyncClient<UdpResponse>, future::AbortHandle),
+    secondary_client: Option<(AsyncClient<UdpResponse>, future::AbortHandle)>,
+}
+
+impl AsyncDnsResolver {
+    pub async fn new(primary: &str, secondary: Option<&str>) -> CrateResult<Self> {
+        let primary_client = new_async_client(primary).await?;
+        let secondary_client = if let Some(secondary) = secondary {
+            let secondary_client = new_async_client(secondary).await?;
+            Some(secondary_client)
+        } else {
+            None
+        };
+        Ok(Self {
+            primary_client,
+            secondary_client,
+        })
+    }
+
+    pub async fn new_google_dns() -> CrateResult<Self> { // Google Public DNS
+        Self::new("8.8.8.8:53", Some("8.8.4.4:53")).await
+    }
+
+    async fn try_resolve_addr_by(addr: &SocksAddr, client: &mut AsyncClient<UdpResponse>) -> CrateResult<SocketAddr> {
+        match addr {
+            #[cfg(any(feature = "proto-ipv4", feature = "proto-ipv6"))]
+            SocksAddr::SocketAddr(socket_addr) => Ok(socket_addr.clone()),
+            SocksAddr::DomainPort(domain, port) => {
+                let ip = AsyncDnsResolver::try_resolve_domain_by(domain, client).await?;
+                Ok((ip, port.clone()).into())
+            }
+        }
+    }
+
+    async fn try_resolve_domain_by(domain: &str, client: &mut AsyncClient<UdpResponse>) -> CrateResult<::std::net::IpAddr> {
+        let name = to_name(domain)?;
+        let response = client.query(name, DNSClass::IN, RecordType::A).await;
+        dns_response_to_ip2(domain, response)
+    }
+
+    pub async fn try_resolve_addr(&mut self, addr: &SocksAddr) -> CrateResult<SocketAddr> {
+        let result = AsyncDnsResolver::try_resolve_addr_by(addr, &mut self.primary_client.0).await;
+        if result.is_ok() {
+            result
+        } else {
+            if let Some(ref mut secondary_client) = &mut self.secondary_client {
+                AsyncDnsResolver::try_resolve_addr_by(addr, &mut secondary_client.0).await
+            } else {
+                result
+            }
+        }
+    }
+
+    pub async fn try_resolve_domain(&mut self, domain: &str) -> CrateResult<::std::net::IpAddr> {
+        let result = AsyncDnsResolver::try_resolve_domain_by(domain, &mut self.primary_client.0).await;
+        if result.is_ok() {
+            result
+        } else {
+            if let Some(ref mut secondary_client) = &mut self.secondary_client {
+                AsyncDnsResolver::try_resolve_domain_by(domain, &mut secondary_client.0).await
+            } else {
+                result
+            }
+        }
+    }
 }
 
 pub struct DnsResolver {
@@ -120,15 +205,8 @@ impl DnsResolver {
             #[cfg(any(feature = "proto-ipv4", feature = "proto-ipv6"))]
             SocksAddr::SocketAddr(socket_addr) => Ok(socket_addr.clone()),
             SocksAddr::DomainPort(domain, port) => {
-                if let Ok(ip) = DnsResolver::try_resolve_domain_by(domain, client) {
-                    if let Ok(addr) = SocketAddr::new(ip.into(), port.clone()) {
-                        Ok(addr)
-                    } else {
-                        Err(Error::DnsError(Some(domain.to_string())))
-                    }
-                } else {
-                    Err(Error::DnsError(Some(domain.to_string())))
-                }
+                let ip = DnsResolver::try_resolve_domain_by(domain, client)?;
+                Ok((ip, port.clone()).into())
             }
         }
     }
@@ -136,15 +214,7 @@ impl DnsResolver {
     fn try_resolve_domain_by(domain: &str, client: &SyncClient<UdpClientConnection>) -> CrateResult<::std::net::IpAddr> {
         let name = to_name(domain)?;
         let response = client.query(&name, DNSClass::IN, RecordType::A);
-        if let Ok(resolved) = dns_response_to_ip(response) {
-            if let Some(ip) = resolved {
-                Ok(ip)
-            } else {
-                Err(Error::DnsError(Some(domain.to_string())))
-            }
-        } else {
-            Err(Error::DnsError(Some(domain.to_string())))
-        }
+        dns_response_to_ip2(domain, response)
     }
 
     pub fn try_resolve_addr(&self, addr: &SocksAddr) -> CrateResult<SocketAddr> {

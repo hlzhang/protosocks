@@ -18,7 +18,7 @@ pub use protocol::{
 #[cfg(all(feature = "dns", feature = "std"))]
 pub use protocol::DnsResolver;
 #[cfg(all(feature = "dns", feature = "rt_tokio", feature = "std"))]
-pub use protocol::resolve_domain_async;
+pub use protocol::{resolve_domain_async, AsyncDnsResolver};
 
 pub(crate) mod protocol;
 

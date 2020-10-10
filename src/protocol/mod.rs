@@ -11,7 +11,7 @@ pub use cmd_rep::{CmdRepr, Packet as CmdPacket, Packet as RepPacket, RepRepr};
 #[cfg(all(feature = "dns", feature = "std"))]
 pub use dns::{resolve_addr, DnsResolver};
 #[cfg(all(feature = "dns", feature = "rt_tokio", feature = "std"))]
-pub use dns::{resolve_domain_async};
+pub use dns::{resolve_domain_async, AsyncDnsResolver};
 pub use method_selection::{
     ReplyPacket as MethodPacket, ReplyRepr as MethodRepr, RequestPacket as MethodsPacket,
     RequestRepr as MethodsRepr,
