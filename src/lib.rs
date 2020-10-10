@@ -16,9 +16,9 @@ pub use protocol::{
     UdpFragAssembler, UdpPacket, UdpRepr, UserPassPacket, UserPassRepr, Ver,
 };
 #[cfg(all(feature = "dns", feature = "std"))]
-pub use protocol::resolve;
+pub use protocol::DnsResolver;
 #[cfg(all(feature = "dns", feature = "rt_tokio", feature = "std"))]
-pub use protocol::resolve_async;
+pub use protocol::resolve_domain_async;
 
 pub(crate) mod protocol;
 

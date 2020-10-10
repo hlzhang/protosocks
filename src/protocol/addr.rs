@@ -288,19 +288,8 @@ impl Addr {
 
     /// nameserver e.g. 8.8.8.8:53
     #[cfg(all(feature = "dns", feature = "std"))]
-    pub fn resolve(&self, nameserver: &str) -> CrateResult<Option<SocketAddr>> {
-        Ok(match self {
-            #[cfg(any(feature = "proto-ipv4", feature = "proto-ipv6"))]
-            Addr::SocketAddr(socket_addr) => Some(socket_addr.clone()),
-            Addr::DomainPort(domain, port) => {
-                let resolved = super::resolve(domain.as_str(), nameserver)?;
-                if let Some(ip_addr) = resolved {
-                    Some(SocketAddr::new(ip_addr.into(), port.clone())?)
-                } else {
-                    None
-                }
-            }
-        })
+    pub fn resolve(&self, nameserver: &str) -> CrateResult<SocketAddr> {
+        super::resolve_addr(self, nameserver)
     }
 }
 

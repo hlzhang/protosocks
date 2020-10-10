@@ -9,9 +9,9 @@ use snafu::Snafu;
 pub use addr::{Addr as SocksAddr, HasAddr};
 pub use cmd_rep::{CmdRepr, Packet as CmdPacket, Packet as RepPacket, RepRepr};
 #[cfg(all(feature = "dns", feature = "std"))]
-pub use dns::resolve;
+pub use dns::{resolve_addr, DnsResolver};
 #[cfg(all(feature = "dns", feature = "rt_tokio", feature = "std"))]
-pub use dns::resolve_async;
+pub use dns::{resolve_domain_async};
 pub use method_selection::{
     ReplyPacket as MethodPacket, ReplyRepr as MethodRepr, RequestPacket as MethodsPacket,
     RequestRepr as MethodsRepr,
@@ -39,7 +39,8 @@ pub enum Error {
     Truncated,
     #[cfg(not(all(feature = "proto-ipv4", feature = "proto-ipv6")))]
     UnsupportedAtyp,
-    AddrParseError,
+    AddrError,
+    DnsError(Option<String>),
 }
 
 impl std::error::Error for Error {}
@@ -58,7 +59,7 @@ impl From<std::str::Utf8Error> for Error {
 
 impl From<smolsocket::Error> for Error {
     fn from(_val: smolsocket::Error) -> Self {
-        Error::AddrParseError
+        Error::AddrError
     }
 }
 
