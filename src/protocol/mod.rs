@@ -6,8 +6,12 @@ use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
 use snafu::Snafu;
 
-pub use addr::{Addr as SocksAddr, HasAddr, resolve, resolve_async};
+pub use addr::{Addr as SocksAddr, HasAddr};
 pub use cmd_rep::{CmdRepr, Packet as CmdPacket, Packet as RepPacket, RepRepr};
+#[cfg(all(feature = "dns", feature = "std"))]
+pub use dns::resolve;
+#[cfg(all(feature = "dns", feature = "rt_tokio", feature = "std"))]
+pub use dns::resolve_async;
 pub use method_selection::{
     ReplyPacket as MethodPacket, ReplyRepr as MethodRepr, RequestPacket as MethodsPacket,
     RequestRepr as MethodsRepr,
@@ -26,6 +30,8 @@ mod cmd_rep;
 mod method_selection;
 mod rfc1929;
 mod udp;
+#[cfg(all(feature = "dns", feature = "std"))]
+mod dns;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Error {

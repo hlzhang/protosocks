@@ -12,9 +12,13 @@ pub use protocol::{
     Atyp, AuthReplyPacket,
     AuthReplyRepr, Cmd, CmdPacket, CmdRepr, Decoder as ProtocolDecoder, Encoder as ProtocolEncoder, Error as ProtocolError,
     HasAddr, Method, MethodPacket, MethodRepr, MethodsPacket, MethodsRepr,
-    Rep, RepPacket, RepRepr, resolve, resolve_async, Rfc1929Ver, SocksAddr, Status, UdpFrag,
+    Rep, RepPacket, RepRepr, Rfc1929Ver, SocksAddr, Status, UdpFrag,
     UdpFragAssembler, UdpPacket, UdpRepr, UserPassPacket, UserPassRepr, Ver,
 };
+#[cfg(all(feature = "dns", feature = "std"))]
+pub use protocol::resolve;
+#[cfg(all(feature = "dns", feature = "rt_tokio", feature = "std"))]
+pub use protocol::resolve_async;
 
 pub(crate) mod protocol;
 
