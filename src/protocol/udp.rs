@@ -452,6 +452,10 @@ impl FragAssembler {
     }
 
     pub fn on_frag(&mut self, udp_frag: Frag, now: &SystemTime) -> Option<Vec<Frag>> {
+        if !udp_frag.is_frag() {
+            return Some(vec![udp_frag]);
+        }
+
         let frag = udp_frag.frag();
         let time_ok = self.time.map_or(true, |time| now.duration_since(time).unwrap_or(DURATION_0).as_secs() < 10);
         if frag > self.highest && time_ok {
