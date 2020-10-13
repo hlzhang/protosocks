@@ -9,7 +9,7 @@ use smolsocket::port_from_bytes;
 use crate::field::Field;
 
 use super::{
-    addr::field_port, Decoder, Encodable, Encoder, Error, field, HasAddr, CrateResult, SocksAddr,
+    addr::field_port, CrateResult, Decoder, Encodable, Encoder, Error, field, HasAddr, SocksAddr,
 };
 
 //
@@ -429,13 +429,19 @@ pub struct FragAssembler {
     pub(crate) time: Option<SystemTime>,
 }
 
-impl FragAssembler {
-    pub fn new() -> Self {
+impl Default for FragAssembler {
+    fn default() -> FragAssembler {
         FragAssembler {
             slots: vec![None; 127],
             highest: 0,
             time: None,
         }
+    }
+}
+
+impl FragAssembler {
+    pub fn new() -> Self {
+        Default::default()
     }
 
     pub fn is_frag(udp_frag: &Frag) -> bool {
@@ -478,7 +484,7 @@ impl FragAssembler {
                 }
             } else {
                 if self.highest == 0 {
-                    self.time = Some(now.clone());
+                    self.time = Some(*now);
                 }
                 self.slots[frag as usize - 1] = Some(udp_frag);
                 self.highest = frag;
@@ -820,7 +826,7 @@ mod tests {
         assert_eq!(frags[2].frag(), 3);
         assert_eq!(frags[2].frag, 0b1000_0000 | 3);
         assert_eq!(frags[2].is_last_frag(), true);
-        let mut assembler = FragAssembler::new();
+        let mut assembler = FragAssembler::default();
         assert_eq!(assembler.on_frag(frags[0].clone(), &now), None);
         assert_eq!(assembler.slots[0], Some(frags[0].clone()));
         assert_eq!(assembler.on_frag(frags[1].clone(), &now), None);
@@ -830,12 +836,12 @@ mod tests {
             Some(vec![frags[0].clone(), frags[1].clone(), frags[2].clone()])
         );
 
-        let mut assembler = FragAssembler::new();
+        let mut assembler = FragAssembler::default();
         assert_eq!(assembler.on_frag(frags[2].clone(), &now), None);
         assert_eq!(assembler.slots[2], None);
         assert_eq!(assembler.highest, 0);
 
-        let mut assembler = FragAssembler::new();
+        let mut assembler = FragAssembler::default();
         assert_eq!(assembler.on_frag(frags[1].clone(), &now), None);
         assert_eq!(assembler.slots[1], Some(frags[1].clone()));
         assert_eq!(assembler.highest, 2);

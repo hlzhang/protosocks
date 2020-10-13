@@ -373,11 +373,11 @@ impl ReplyRepr {
     }
 
     pub fn is_no_auth(&self) -> bool {
-        return self.method == Method::NoAuth;
+        self.method == Method::NoAuth
     }
 
     pub fn is_no_methods(&self) -> bool {
-        return self.method == Method::NoMethods;
+        self.method == Method::NoMethods
     }
 }
 

@@ -232,14 +232,17 @@ pub enum Cmd {
 }
 
 impl Cmd {
+    #[allow(clippy::trivially_copy_pass_by_ref)]
     pub fn is_tcp_bind(&self) -> bool {
         self == &Cmd::Bind
     }
 
+    #[allow(clippy::trivially_copy_pass_by_ref)]
     pub fn is_tcp_connect(&self) -> bool {
         self == &Cmd::Connect
     }
 
+    #[allow(clippy::trivially_copy_pass_by_ref)]
     pub fn is_udp_associate(&self) -> bool {
         self == &Cmd::UdpAssociate
     }

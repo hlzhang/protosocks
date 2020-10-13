@@ -23,9 +23,9 @@ use super::{CrateResult, Error, SocksAddr};
 fn dns_response_to_ip(response: ClientResult<DnsResponse>) -> CrateResult<Option<::std::net::IpAddr>> {
     let response = response.map_err(|_| Error::DnsError(None))?;
     let answers: &[Record] = response.answers();
-    Ok(if answers.len() > 0 {
-        if let &RData::A(ref ip) = answers[0].rdata() {
-            Some(::std::net::IpAddr::V4(ip.clone()))
+    Ok(if !answers.is_empty() {
+        if let RData::A(ip) = *answers[0].rdata() {
+            Some(::std::net::IpAddr::V4(ip))
         } else {
             None
         }
@@ -34,7 +34,7 @@ fn dns_response_to_ip(response: ClientResult<DnsResponse>) -> CrateResult<Option
     })
 }
 
-fn dns_response_to_ip2(domain: &str, response: ClientResult<DnsResponse>) ->CrateResult<::std::net::IpAddr> {
+fn dns_response_to_ip2(domain: &str, response: ClientResult<DnsResponse>) -> CrateResult<::std::net::IpAddr> {
     if let Ok(resolved) = dns_response_to_ip(response) {
         if let Some(ip) = resolved {
             Ok(ip)
@@ -117,10 +117,10 @@ impl AsyncDnsResolver {
     async fn try_resolve_addr_by(addr: &SocksAddr, client: &mut AsyncClient<UdpResponse>) -> CrateResult<SocketAddr> {
         match addr {
             #[cfg(any(feature = "proto-ipv4", feature = "proto-ipv6"))]
-            SocksAddr::SocketAddr(socket_addr) => Ok(socket_addr.clone()),
+            SocksAddr::SocketAddr(socket_addr) => Ok(*socket_addr),
             SocksAddr::DomainPort(domain, port) => {
                 let ip = AsyncDnsResolver::try_resolve_domain_by(domain, client).await?;
-                Ok((ip, port.clone()).into())
+                Ok((ip, *port).into())
             }
         }
     }
@@ -135,12 +135,10 @@ impl AsyncDnsResolver {
         let result = AsyncDnsResolver::try_resolve_addr_by(addr, &mut self.primary_client.0).await;
         if result.is_ok() {
             result
+        } else if let Some(ref mut secondary_client) = &mut self.secondary_client {
+            AsyncDnsResolver::try_resolve_addr_by(addr, &mut secondary_client.0).await
         } else {
-            if let Some(ref mut secondary_client) = &mut self.secondary_client {
-                AsyncDnsResolver::try_resolve_addr_by(addr, &mut secondary_client.0).await
-            } else {
-                result
-            }
+            result
         }
     }
 
@@ -148,12 +146,10 @@ impl AsyncDnsResolver {
         let result = AsyncDnsResolver::try_resolve_domain_by(domain, &mut self.primary_client.0).await;
         if result.is_ok() {
             result
+        } else if let Some(ref mut secondary_client) = &mut self.secondary_client {
+            AsyncDnsResolver::try_resolve_domain_by(domain, &mut secondary_client.0).await
         } else {
-            if let Some(ref mut secondary_client) = &mut self.secondary_client {
-                AsyncDnsResolver::try_resolve_domain_by(domain, &mut secondary_client.0).await
-            } else {
-                result
-            }
+            result
         }
     }
 }
@@ -203,10 +199,10 @@ impl DnsResolver {
     fn try_resolve_addr_by(addr: &SocksAddr, client: &SyncClient<UdpClientConnection>) -> CrateResult<SocketAddr> {
         match addr {
             #[cfg(any(feature = "proto-ipv4", feature = "proto-ipv6"))]
-            SocksAddr::SocketAddr(socket_addr) => Ok(socket_addr.clone()),
+            SocksAddr::SocketAddr(socket_addr) => Ok(*socket_addr),
             SocksAddr::DomainPort(domain, port) => {
                 let ip = DnsResolver::try_resolve_domain_by(domain, client)?;
-                Ok((ip, port.clone()).into())
+                Ok((ip, *port).into())
             }
         }
     }
@@ -221,12 +217,10 @@ impl DnsResolver {
         let result = DnsResolver::try_resolve_addr_by(addr, &self.primary_client);
         if result.is_ok() {
             result
+        } else if let Some(ref secondary_client) = self.secondary_client {
+            DnsResolver::try_resolve_addr_by(addr, secondary_client)
         } else {
-            if let Some(ref secondary_client) = self.secondary_client {
-                DnsResolver::try_resolve_addr_by(addr, secondary_client)
-            } else {
-                result
-            }
+            result
         }
     }
 
@@ -234,12 +228,10 @@ impl DnsResolver {
         let result = DnsResolver::try_resolve_domain_by(domain, &self.primary_client);
         if result.is_ok() {
             result
+        } else if let Some(ref secondary_client) = self.secondary_client {
+            DnsResolver::try_resolve_domain_by(domain, secondary_client)
         } else {
-            if let Some(ref secondary_client) = self.secondary_client {
-                DnsResolver::try_resolve_domain_by(domain, secondary_client)
-            } else {
-                result
-            }
+            result
         }
     }
 }

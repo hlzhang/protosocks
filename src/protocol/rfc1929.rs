@@ -42,10 +42,13 @@ pub enum Status {
 }
 
 impl Status {
+
+    #[allow(clippy::trivially_copy_pass_by_ref)]
     pub fn is_failure(&self) -> bool {
         self == &Status::Failure
     }
 
+    #[allow(clippy::trivially_copy_pass_by_ref)]
     pub fn is_success(&self) -> bool {
         self == &Status::Success
     }

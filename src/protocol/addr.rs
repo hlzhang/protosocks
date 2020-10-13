@@ -281,7 +281,7 @@ impl Addr {
                 let domain_len = min(domain_bytes.len(), 255);
                 bytes[1] = domain_len as u8;
                 bytes[2..2 + domain_bytes.len()].copy_from_slice(domain_bytes);
-                &mut bytes[total_len - 2..total_len].copy_from_slice(&port_to_bytes(*port));
+                bytes[total_len - 2..total_len].copy_from_slice(&port_to_bytes(*port));
             }
         }
     }
