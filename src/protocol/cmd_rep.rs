@@ -325,6 +325,9 @@ impl<T: AsRef<[u8]>> AsRef<[u8]> for Packet<T> {
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct CmdRepr {
     pub cmd: Cmd,
+    /// TCP_CONNECT: target_addr:target_port
+    /// TCP_BIND: target_addr:target_port
+    /// UDP_ASSOCIATE: src_addr:src_port, zeros if cant provide (client behind NAT)
     pub addr: SocksAddr,
 }
 
@@ -432,6 +435,11 @@ impl Encoder<CmdRepr> for CmdRepr {
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct RepRepr {
     pub rep: Rep,
+    /// TCP_CONNECT: local_addr:local_port may different from server address
+    /// (from the client perspective) if the server is multi-homed
+    /// TCP_BIND listening: bnd_addr:bnd_port
+    /// TCP_BIND connected: target_addr:target_port
+    /// UDP_ASSOCIATE listening: bnd_addr:bnd_port
     pub addr: SocksAddr,
 }
 
