@@ -15,10 +15,10 @@ pub use protocol::{
     Rep, RepPacket, RepRepr, Rfc1929Ver, SocksAddr, Status, UdpFrag,
     UdpFragAssembler, UdpPacket, UdpRepr, UserPassPacket, UserPassRepr, Ver,
 };
+#[cfg(all(feature = "dns", feature = "rt_tokio", feature = "std"))]
+pub use protocol::{AsyncDnsResolver, resolve_domain_async};
 #[cfg(all(feature = "dns", feature = "std"))]
 pub use protocol::DnsResolver;
-#[cfg(all(feature = "dns", feature = "rt_tokio", feature = "std"))]
-pub use protocol::{resolve_domain_async, AsyncDnsResolver};
 
 pub(crate) mod protocol;
 
@@ -230,8 +230,72 @@ impl ProtocolEncoder<Request> for Request {
 
 #[cfg(test)]
 mod tests {
+    use ::std::{env, sync::{Arc, Mutex}};
+    use core::fmt;
+
+    use bytes::BytesMut;
+    use lazy_static::lazy_static;
+
+    use smolsocket::SocketAddr;
+
+    use crate::{AuthReplyRepr, CmdRepr, MethodRepr, MethodsRepr, protocol::{Decoder, Encodable, Method}, RepRepr, SocksAddr, Status, UserPassRepr};
+
+    lazy_static! {
+        static ref INITIATED: Arc<Mutex<bool>> = Arc::new(Mutex::new(false));
+    }
+
+    pub(crate) fn init_logger() {
+        let mut initiated = INITIATED.lock().unwrap();
+        if *initiated == false {
+            if env::var("RUST_LOG").is_err() { env::set_var("RUST_LOG", "debug"); }
+            let _ = pretty_env_logger::try_init_timed();
+            *initiated = true;
+        }
+    }
+
     #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
+    fn test_sticky_packets() {
+        init_logger();
+
+        let msg = MethodsRepr::new(vec![Method::NoAuth, Method::UserPass]);
+        test_sticky(msg);
+
+        let msg = MethodRepr::new(Method::NoAuth);
+        test_sticky(msg);
+
+        let msg = UserPassRepr::new("user", "pass");
+        test_sticky(msg);
+
+        let msg = AuthReplyRepr::new(Status::Success);
+        test_sticky(msg);
+
+        let msg = CmdRepr::new_connect(SocksAddr::DomainPort("google.com".to_string(), 443));
+        test_sticky(msg);
+
+        let msg = RepRepr::new_success(SocksAddr::SocketAddr(SocketAddr::new_v4_all_zeros()));
+        test_sticky(msg);
+    }
+
+    fn test_sticky<T: Clone + fmt::Debug + Decoder<T> + Encodable + PartialEq>(msg: T) {
+        let mut bytes_mut = BytesMut::new();
+        msg.encode_into(&mut bytes_mut);
+        debug!("encoded:           {:?}", bytes_mut);
+        assert_eq!(T::decode(&mut bytes_mut.clone()), Ok(Some(msg.clone())));
+
+        let mut without_last_byte = bytes_mut.clone().split_to(bytes_mut.len() - 1);
+        debug!("without_last_byte: {:?}", without_last_byte);
+        assert_eq!(T::decode(&mut without_last_byte), Ok(None));
+
+        let mut one_byte_more = bytes_mut.clone();
+        one_byte_more.extend_from_slice(&bytes_mut.as_ref()[0..1]);
+        debug!("one_byte_more:     {:?}", one_byte_more);
+        assert_eq!(T::decode(&mut one_byte_more), Ok(Some(msg.clone())));
+        assert_eq!(T::decode(&mut one_byte_more), Ok(None));
+
+        let mut double = bytes_mut.clone();
+        double.extend_from_slice(bytes_mut.as_ref());
+        debug!("double:            {:?}", double);
+        assert_eq!(T::decode(&mut double), Ok(Some(msg.clone())));
+        assert_eq!(T::decode(&mut double), Ok(Some(msg.clone())));
     }
 }

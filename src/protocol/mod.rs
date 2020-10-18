@@ -74,8 +74,8 @@ mod field {
     /// method selection request
     pub const NMETHODS: usize = 1;
     /// method selection request
-    pub const METHODS: Rest = 2..;
-
+    pub const METHODS_START: usize = 2;
+    /// method selection request
     pub fn methods(nmethods: u8) -> Field {
         2..2 + nmethods as usize
     }

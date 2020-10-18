@@ -3,7 +3,7 @@ use core::fmt;
 
 use bytes::{Buf, BytesMut};
 
-use super::{Cmd, Decoder, Encodable, Encoder, Error, field, HasAddr, Rep, CrateResult, SocksAddr, Ver};
+use super::{Cmd, CrateResult, Decoder, Encodable, Encoder, Error, field, HasAddr, Rep, SocksAddr, Ver};
 use super::addr::field_port;
 
 // Requests
@@ -183,12 +183,8 @@ impl<T: AsRef<[u8]>> Packet<T> {
     /// [set_methods]: #method.set_socks_addr
     #[inline]
     pub fn check_len(&self) -> CrateResult<()> {
-        self.addr.check_addr_len()?;
-        if self.buffer_ref().len() > self.total_len() {
-            Err(Error::Malformed)
-        } else {
-            Ok(())
-        }
+        let result = self.addr.check_addr_len();
+        Ok(result?)
     }
 
     /// Return the length (unchecked).
@@ -541,7 +537,9 @@ mod tests {
 
     #[cfg(feature = "proto-ipv4")]
     #[test]
-    fn test_cmd_invalid_len() {
+    fn test_cmd_bytes_truncated() {
+        crate::tests::init_logger();
+
         let mut truncated_bytes = vec![0x00 as u8; 4];
         let mut truncated = Packet::new_unchecked(&mut truncated_bytes);
         truncated.set_version(Ver::SOCKS5 as u8);
@@ -556,18 +554,23 @@ mod tests {
         truncated.set_version(Ver::SOCKS5 as u8);
         truncated.set_atyp(Atyp::V4 as u8);
         assert_eq!(truncated.check_len(), Err(Error::Truncated));
-
         assert_eq!(truncated.total_len(), 10);
-        let mut malformed_bytes = vec![0x00 as u8; truncated.total_len() + 1];
-        let mut malformed = Packet::new_unchecked(&mut malformed_bytes);
-        malformed.set_version(Ver::SOCKS5 as u8);
-        malformed.set_atyp(Atyp::V4 as u8);
-        assert_eq!(malformed.check_len(), Err(Error::Malformed));
-        let mut malformed_bytes_mut = BytesMut::new();
-        malformed_bytes_mut.extend(malformed_bytes);
+    }
+
+    #[cfg(feature = "proto-ipv4")]
+    #[test]
+    fn test_cmd_bytes_more() {
+        let mut bytes_one_more = vec![0x00 as u8; 11]; // needs 10 but give it 11
+        let mut one_more = Packet::new_unchecked(&mut bytes_one_more);
+        one_more.set_version(Ver::SOCKS5 as u8);
+        one_more.set_atyp(Atyp::V4 as u8);
+        one_more.set_cmd_or_rep(Cmd::Connect.into());
+        assert_eq!(one_more.check_len(), Ok(()));
+        let mut bytes_one_more_mut = BytesMut::new();
+        bytes_one_more_mut.extend(bytes_one_more);
         assert_eq!(
-            CmdRepr::decode(&mut malformed_bytes_mut),
-            Err(Error::Malformed)
+            CmdRepr::decode(&mut bytes_one_more_mut),
+            Ok(Some(CmdRepr::new_connect(SocksAddr::SocketAddr(SocketAddr::new_v4_all_zeros()))))
         );
     }
 
@@ -710,7 +713,7 @@ mod tests {
 
     #[cfg(feature = "proto-ipv4")]
     #[test]
-    fn test_rep_invalid_len() {
+    fn test_rep_bytes_truncated() {
         let mut truncated_bytes = vec![0x00 as u8; 4];
         let mut truncated = Packet::new_unchecked(&mut truncated_bytes);
         truncated.set_version(Ver::SOCKS5 as u8);
@@ -725,18 +728,23 @@ mod tests {
         truncated.set_version(Ver::SOCKS5 as u8);
         truncated.set_atyp(Atyp::V4 as u8);
         assert_eq!(truncated.check_len(), Err(Error::Truncated));
-
         assert_eq!(truncated.total_len(), 10);
-        let mut malformed_bytes = vec![0x00 as u8; truncated.total_len() + 1];
-        let mut malformed = Packet::new_unchecked(&mut malformed_bytes);
-        malformed.set_version(Ver::SOCKS5 as u8);
-        malformed.set_atyp(Atyp::V4 as u8);
-        assert_eq!(malformed.check_len(), Err(Error::Malformed));
-        let mut malformed_bytes_mut = BytesMut::new();
-        malformed_bytes_mut.extend(malformed_bytes);
+    }
+
+    #[cfg(feature = "proto-ipv4")]
+    #[test]
+    fn test_rep_bytes_more() {
+        let mut bytes_one_more = vec![0x00 as u8; 11]; // needs 10 but give it 11
+        let mut one_more = Packet::new_unchecked(&mut bytes_one_more);
+        one_more.set_version(Ver::SOCKS5 as u8);
+        one_more.set_atyp(Atyp::V4 as u8);
+        one_more.set_cmd_or_rep(Rep::Success.into());
+        assert_eq!(one_more.check_len(), Ok(()));
+        let mut one_more_bytes_mut = BytesMut::new();
+        one_more_bytes_mut.extend(bytes_one_more);
         assert_eq!(
-            RepRepr::decode(&mut malformed_bytes_mut),
-            Err(Error::Malformed)
+            RepRepr::decode(&mut one_more_bytes_mut),
+            Ok(Some(RepRepr::new_success(SocksAddr::SocketAddr(SocketAddr::new_v4_all_zeros()))))
         );
     }
 

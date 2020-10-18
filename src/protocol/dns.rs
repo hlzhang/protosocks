@@ -238,20 +238,11 @@ impl DnsResolver {
 
 #[cfg(test)]
 mod test {
-    use ::std::env;
-
     use super::*;
-
-    fn init_logger() {
-        if env::var("RUST_LOG").is_err() {
-            env::set_var("RUST_LOG", "debug");
-        }
-        let _ = pretty_env_logger::try_init_timed();
-    }
 
     #[test]
     fn test_socks_addr_domain_resolve() {
-        init_logger();
+        crate::tests::init_logger();
 
         let socks_addr = SocksAddr::DomainPort("bing.com".to_string(), 443);
         let resolved = socks_addr.resolve("8.8.8.8:53");
@@ -264,7 +255,7 @@ mod test {
     #[cfg(all(feature = "rt_tokio"))]
     #[tokio::test]
     async fn test_resolve_async() {
-        init_logger();
+        crate::tests::init_logger();
 
         let result = resolve_domain_async("google.com", "8.8.8.8:53").await;
         info!("result {:?}", result);

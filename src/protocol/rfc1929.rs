@@ -9,7 +9,7 @@ use snafu::Snafu;
 
 use crate::field::Field;
 
-use super::{Decoder, Encodable, Encoder, Error, field, CrateResult};
+use super::{CrateResult, Decoder, Encodable, Encoder, Error, field};
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, FromPrimitive, Hash, PartialEq, Serialize, Snafu)]
 #[repr(u8)]
@@ -42,7 +42,6 @@ pub enum Status {
 }
 
 impl Status {
-
     #[allow(clippy::trivially_copy_pass_by_ref)]
     pub fn is_failure(&self) -> bool {
         self == &Status::Failure
@@ -127,8 +126,6 @@ impl<T: AsRef<[u8]>> RequestPacket<T> {
                 let field_passwd = field_passwd(ulen, plen);
                 if len < field_passwd.end {
                     Err(Error::Truncated)
-                } else if len > self.total_len() {
-                    Err(Error::Malformed)
                 } else {
                     Ok(())
                 }
@@ -396,7 +393,6 @@ impl<T: AsRef<[u8]>> ReplyPacket<T> {
     pub fn check_len(&self) -> CrateResult<()> {
         match self.buffer.as_ref().len() {
             l if l < self.total_len() => Err(Error::Truncated),
-            l if l > self.total_len() => Err(Error::Malformed),
             _ => Ok(()),
         }
     }
@@ -655,14 +651,14 @@ mod tests {
             }))
         );
 
-        let mut empty_bytes = BytesMut::new();
-        empty_bytes.extend(vec![0x00 as u8; 4]);
-        empty_bytes[1] = 0; // set ulen to 0
-        empty_bytes[2] = 0; // set plen to 0
-        let mut empty = RequestPacket::new_unchecked(&mut empty_bytes);
+        let mut bytes_one_more = BytesMut::new();
+        bytes_one_more.extend(vec![0x00 as u8; 4]);
+        bytes_one_more[1] = 0; // set ulen to 0
+        bytes_one_more[2] = 0; // set plen to 0
+        let mut empty = RequestPacket::new_unchecked(&mut bytes_one_more);
         empty.set_version(Ver::X01 as u8);
-        assert_eq!(empty.check_len(), Err(Error::Malformed));
-        assert_eq!(RequestRepr::decode(&mut empty_bytes), Err(Error::Malformed));
+        assert_eq!(empty.check_len(), Ok(()));
+        assert_eq!(RequestRepr::decode(&mut bytes_one_more), Ok(Some(RequestRepr::new("", ""))));
 
         let mut truncated_bytes = BytesMut::new();
         truncated_bytes.extend(vec![0x00 as u8; 2]);
@@ -797,15 +793,15 @@ mod tests {
         truncated.set_version(Ver::X01 as u8);
         assert_eq!(ReplyRepr::decode(&mut truncated_bytes), Ok(None));
 
-        let mut malformed_bytes = BytesMut::new();
-        malformed_bytes.extend(vec![0x00 as u8; 3]);
-        let mut malformed = ReplyPacket::new_unchecked(&mut malformed_bytes);
-        assert_eq!(malformed.total_len(), 2);
-        malformed.set_version(Ver::X01 as u8);
-        malformed.set_status(Status::Success as u8);
+        let mut bytes_one_more = BytesMut::new();
+        bytes_one_more.extend(vec![0x00 as u8; 3]);
+        let mut one_more = ReplyPacket::new_unchecked(&mut bytes_one_more);
+        assert_eq!(one_more.total_len(), 2);
+        one_more.set_version(Ver::X01 as u8);
+        one_more.set_status(Status::Success as u8);
         assert_eq!(
-            ReplyRepr::decode(&mut malformed_bytes),
-            Err(Error::Malformed)
+            ReplyRepr::decode(&mut bytes_one_more),
+            Ok(Some(ReplyRepr::new_success()))
         );
 
         let mut malformed_bytes = BytesMut::new();

@@ -3,7 +3,7 @@ use core::fmt;
 
 use bytes::{Buf, BytesMut};
 
-use super::{Decoder, Encodable, Encoder, Error, field, Method, CrateResult, ToU8Vec, Ver};
+use super::{CrateResult, Decoder, Encodable, Encoder, Error, field, Method, ToU8Vec, Ver};
 
 pub type Methods = Vec<Method>;
 
@@ -37,10 +37,8 @@ impl<T: AsRef<[u8]>> RequestPacket<T> {
     pub fn check_len(&self) -> CrateResult<()> {
         let len = self.buffer.as_ref().len();
 
-        if len < field::METHODS.start || len < self.total_len() {
+        if len < field::METHODS_START || len < self.total_len() {
             Err(Error::Truncated)
-        } else if len > self.total_len() {
-            Err(Error::Malformed)
         } else {
             Ok(())
         }
@@ -49,7 +47,7 @@ impl<T: AsRef<[u8]>> RequestPacket<T> {
     /// Return the length.
     #[inline]
     pub fn total_len(&self) -> usize {
-        field::METHODS.start + self.nmethods() as usize
+        field::METHODS_START + self.nmethods() as usize
     }
 
     /// Return the version field.
@@ -83,8 +81,9 @@ impl<'a, T: AsRef<[u8]> + ?Sized> RequestPacket<&'a T> {
     /// Return a pointer to the methods.
     #[inline]
     pub fn methods(&self) -> &'a [u8] {
+        let nmethods = self.nmethods();
         let data = self.buffer.as_ref();
-        &data[field::METHODS]
+        &data[field::methods(nmethods)]
     }
 }
 
@@ -119,8 +118,9 @@ impl<T: AsRef<[u8]> + AsMut<[u8]>> RequestPacket<T> {
     /// Return a mutable pointer to the methods.
     #[inline]
     pub fn methods_mut(&mut self) -> &mut [u8] {
+        let nmethods = self.nmethods();
         let data = self.buffer.as_mut();
-        &mut data[field::METHODS]
+        &mut data[field::methods(nmethods)]
     }
 }
 
@@ -183,7 +183,7 @@ impl RequestRepr {
 
     /// Return the length of that will be emitted from this high-level representation.
     pub fn buffer_len(&self) -> usize {
-        field::METHODS.start + self.methods.len()
+        field::METHODS_START + self.methods.len()
     }
 
     /// Emit a high-level representation into a packet.
@@ -255,7 +255,6 @@ impl<T: AsRef<[u8]>> ReplyPacket<T> {
     pub fn check_len(&self) -> CrateResult<()> {
         match self.buffer.as_ref().len() {
             l if l < self.total_len() => Err(Error::Truncated),
-            l if l > self.total_len() => Err(Error::Malformed),
             _ => Ok(()),
         }
     }
@@ -538,15 +537,15 @@ mod tests {
             Err(Error::Malformed)
         );
 
-        let mut malformed_bytes = BytesMut::new();
-        malformed_bytes.extend(vec![0x00 as u8; 4]);
-        let mut malformed = RequestPacket::new_unchecked(&mut malformed_bytes);
-        malformed.set_version(Ver::SOCKS5 as u8);
-        malformed.set_nmethods(1);
-        malformed.set_methods(&[Method::NoAuth]);
+        let mut bytes_one_more = BytesMut::new();
+        bytes_one_more.extend(vec![0x00 as u8; 4]);
+        let mut one_more = RequestPacket::new_unchecked(&mut bytes_one_more);
+        one_more.set_version(Ver::SOCKS5 as u8);
+        one_more.set_nmethods(1);
+        one_more.set_methods(&[Method::NoAuth]);
         assert_eq!(
-            RequestRepr::decode(&mut malformed_bytes),
-            Err(Error::Malformed)
+            RequestRepr::decode(&mut bytes_one_more),
+            Ok(Some(RequestRepr::new(vec![Method::NoAuth])))
         );
     }
 
@@ -616,15 +615,15 @@ mod tests {
         truncated.set_version(Ver::SOCKS5 as u8);
         assert_eq!(ReplyRepr::decode(&mut truncated_bytes), Ok(None));
 
-        let mut malformed_bytes = BytesMut::new();
-        malformed_bytes.extend(vec![0x00 as u8; 3]);
-        let mut malformed = ReplyPacket::new_unchecked(&mut malformed_bytes);
-        assert_eq!(malformed.total_len(), 2);
-        malformed.set_version(Ver::SOCKS5 as u8);
-        malformed.set_method(Method::NoAuth as u8);
+        let mut bytes_one_more = BytesMut::new();
+        bytes_one_more.extend(vec![0x00 as u8; 3]);
+        let mut one_more = ReplyPacket::new_unchecked(&mut bytes_one_more);
+        assert_eq!(one_more.total_len(), 2);
+        one_more.set_version(Ver::SOCKS5 as u8);
+        one_more.set_method(Method::NoAuth as u8);
         assert_eq!(
-            ReplyRepr::decode(&mut malformed_bytes),
-            Err(Error::Malformed)
+            ReplyRepr::decode(&mut bytes_one_more),
+            Ok(Some(ReplyRepr::new(Method::NoAuth)))
         );
 
         let mut malformed_bytes = BytesMut::new();
