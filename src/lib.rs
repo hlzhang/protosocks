@@ -27,6 +27,7 @@ pub(crate) mod field {
     pub type Rest = ::core::ops::RangeFrom<usize>;
 }
 
+// TODO remove this
 #[derive(Clone, Debug, PartialEq)]
 pub enum Error {
     TypeMismatch,
