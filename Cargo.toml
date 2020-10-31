@@ -27,7 +27,7 @@ serde = "1.0"
 serde_derive = "1.0"
 #smolsocket = { version = "0.3", default-features = false }
 smolsocket = { path = "../smolsocket", default-features = false }
-smoltcp = { version = "0.6.0", default-features = false }
+smoltcp = { git = "https://github.com/smoltcp-rs/smoltcp", branch = "master", default-features = false }
 snafu = "0.4.1"
 tokio = { version = "0.2.22", default-features = false, features = ["full"], optional = true }
 tokio-util = { version = "0.3.0", features = ["full"], optional = true }

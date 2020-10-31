@@ -303,6 +303,14 @@ impl Frag {
         // The maximum safe UDP payload is 508 bytes
         508 - header_len
     }
+
+    /// not frag
+    pub fn new(addr: SocksAddr, payload: Bytes) -> Self {
+        Self { frag: 0x00, addr, payload }
+    }
+
+    // TODO user should be able to specify the max_safe_payload_size
+    /// frags
     pub fn new_frags(addr: SocksAddr, payload: Bytes) -> Vec<Self> {
         let mut frags = Vec::new();
         let max_payload_len = Frag::max_safe_payload_size(&addr);
