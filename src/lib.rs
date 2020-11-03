@@ -10,14 +10,14 @@ use bytes::{Bytes, BytesMut};
 
 pub use protocol::{
     Atyp, AuthReplyPacket,
-    AuthReplyRepr, Cmd, CmdPacket, CmdRepr, Decoder as ProtocolDecoder, Encoder as ProtocolEncoder, Error as ProtocolError,
+    AuthReplyRepr, Cmd, CmdPacket, CmdRepr, Decoder as ProtocolDecoder, Encoder as ProtocolEncoder,
     HasAddr, Method, MethodPacket, MethodRepr, MethodsPacket, MethodsRepr,
     Rep, RepPacket, RepRepr, Rfc1929Ver, SocksAddr, Status, UdpFrag,
     UdpFragAssembler, UdpPacket, UdpRepr, UserPassPacket, UserPassRepr, Ver,
 };
-#[cfg(all(feature = "dns", feature = "rt_tokio", feature = "std"))]
+#[cfg(all(feature = "dns", feature = "rt_tokio"))]
 pub use protocol::{AsyncDnsResolver, resolve_domain_async};
-#[cfg(all(feature = "dns", feature = "std"))]
+#[cfg(feature = "dns")]
 pub use protocol::DnsResolver;
 
 pub(crate) mod protocol;
@@ -27,10 +27,12 @@ pub(crate) mod field {
     pub type Rest = ::core::ops::RangeFrom<usize>;
 }
 
-// TODO remove this
 #[derive(Clone, Debug, PartialEq)]
 pub enum Error {
-    TypeMismatch,
+    Malformed,
+    Truncated,
+    #[cfg(feature = "dns")]
+    DnsError(Option<String>),
 }
 
 impl std::error::Error for Error {}
@@ -38,6 +40,18 @@ impl std::error::Error for Error {}
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{:#?}", self)
+    }
+}
+
+impl From<std::str::Utf8Error> for Error {
+    fn from(_val: std::str::Utf8Error) -> Self {
+        Error::Malformed
+    }
+}
+
+impl From<smolsocket::Error> for Error {
+    fn from(_val: smolsocket::Error) -> Self {
+        Error::Malformed
     }
 }
 
@@ -91,7 +105,7 @@ impl TryFrom<Reply> for MethodRepr {
     fn try_from(val: Reply) -> Result<Self, Error> {
         match val {
             Reply::Method(val) => Ok(val),
-            _ => Err(Error::TypeMismatch),
+            _ => Err(Error::Malformed),
         }
     }
 }
@@ -102,7 +116,7 @@ impl TryFrom<Reply> for AuthReplyRepr {
     fn try_from(val: Reply) -> Result<Self, Error> {
         match val {
             Reply::Auth(val) => Ok(val),
-            _ => Err(Error::TypeMismatch),
+            _ => Err(Error::Malformed),
         }
     }
 }
@@ -113,7 +127,7 @@ impl TryFrom<Reply> for RepRepr {
     fn try_from(val: Reply) -> Result<Self, Error> {
         match val {
             Reply::Rep(val) => Ok(val),
-            _ => Err(Error::TypeMismatch),
+            _ => Err(Error::Malformed),
         }
     }
 }
@@ -124,7 +138,7 @@ impl TryFrom<Reply> for Bytes {
     fn try_from(val: Reply) -> Result<Self, Error> {
         match val {
             Reply::Bytes(val) => Ok(val),
-            _ => Err(Error::TypeMismatch),
+            _ => Err(Error::Malformed),
         }
     }
 }
@@ -179,7 +193,7 @@ impl TryFrom<Request> for MethodsRepr {
     fn try_from(val: Request) -> Result<Self, Error> {
         match val {
             Request::Methods(val) => Ok(val),
-            _ => Err(Error::TypeMismatch),
+            _ => Err(Error::Malformed),
         }
     }
 }
@@ -190,7 +204,7 @@ impl TryFrom<Request> for UserPassRepr {
     fn try_from(val: Request) -> Result<Self, Error> {
         match val {
             Request::Auth(val) => Ok(val),
-            _ => Err(Error::TypeMismatch),
+            _ => Err(Error::Malformed),
         }
     }
 }
@@ -201,7 +215,7 @@ impl TryFrom<Request> for CmdRepr {
     fn try_from(val: Request) -> Result<Self, Error> {
         match val {
             Request::Cmd(val) => Ok(val),
-            _ => Err(Error::TypeMismatch),
+            _ => Err(Error::Malformed),
         }
     }
 }
@@ -212,7 +226,7 @@ impl TryFrom<Request> for Bytes {
     fn try_from(val: Request) -> Result<Self, Error> {
         match val {
             Request::Bytes(val) => Ok(val),
-            _ => Err(Error::TypeMismatch),
+            _ => Err(Error::Malformed),
         }
     }
 }

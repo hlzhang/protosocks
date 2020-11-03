@@ -39,7 +39,7 @@ lazy_static = "1.4.0"
 pretty_env_logger = "0.3"
 
 [features]
-dns = ["trust-dns-client"]
+dns = ["std", "trust-dns-client"]
 rt_tokio = ["futures", "tokio", "tokio-util"]
 std = ["smolsocket/std", "smoltcp/std"]
 "proto-ipv4" = ["smolsocket/proto-ipv4", "smoltcp/proto-ipv4"]
@@ -47,6 +47,5 @@ std = ["smolsocket/std", "smoltcp/std"]
 default = [
     "dns",
     "rt_tokio",
-    "std",
     "proto-ipv4", "proto-ipv6"
 ]

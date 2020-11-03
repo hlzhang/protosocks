@@ -287,7 +287,7 @@ impl Addr {
     }
 
     /// nameserver e.g. 8.8.8.8:53
-    #[cfg(all(feature = "dns", feature = "std"))]
+    #[cfg(feature = "dns")]
     pub fn resolve(&self, nameserver: &str) -> CrateResult<SocketAddr> {
         super::resolve_addr(self, nameserver)
     }
@@ -338,7 +338,7 @@ impl TryFrom<&[u8]> for Addr {
                             Ok(Addr::DomainPort(domain, port))
                         }
                         #[cfg(not(all(feature = "proto-ipv4", feature = "proto-ipv6")))]
-                        _ => Err(Error::UnsupportedAtyp),
+                        _ => Err(Error::Malformed),
                     }
                 }
                 l if l < total_len => Err(Error::Truncated),

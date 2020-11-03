@@ -86,7 +86,7 @@ pub async fn resolve_domain_async(domain: &str, nameserver: &str) -> CrateResult
 }
 
 fn to_name(domain: &str) -> CrateResult<Name> {
-    Ok(Name::from_str((domain.to_owned() + ".").as_str()).map_err(|_| Error::AddrError)?)
+    Ok(Name::from_str((domain.to_owned() + ".").as_str()).map_err(|_| Error::Malformed)?)
 }
 
 #[cfg(all(feature = "rt_tokio"))]

@@ -8,10 +8,10 @@ use snafu::Snafu;
 
 pub use addr::{Addr as SocksAddr, HasAddr};
 pub use cmd_rep::{CmdRepr, Packet as CmdPacket, Packet as RepPacket, RepRepr};
-#[cfg(all(feature = "dns", feature = "std"))]
-pub use dns::{resolve_addr, DnsResolver};
-#[cfg(all(feature = "dns", feature = "rt_tokio", feature = "std"))]
-pub use dns::{resolve_domain_async, AsyncDnsResolver};
+#[cfg(feature = "dns")]
+pub use dns::{DnsResolver, resolve_addr};
+#[cfg(all(feature = "dns", feature = "rt_tokio"))]
+pub use dns::{AsyncDnsResolver, resolve_domain_async};
 pub use method_selection::{
     ReplyPacket as MethodPacket, ReplyRepr as MethodRepr, RequestPacket as MethodsPacket,
     RequestRepr as MethodsRepr,
@@ -25,43 +25,15 @@ pub use udp::{
     Packet as UdpPacket, Repr as UdpRepr,
 };
 
+use crate::Error;
+
 mod addr;
 mod cmd_rep;
 mod method_selection;
 mod rfc1929;
 mod udp;
-#[cfg(all(feature = "dns", feature = "std"))]
+#[cfg(feature = "dns")]
 mod dns;
-
-#[derive(Clone, Debug, PartialEq)]
-pub enum Error {
-    Malformed,
-    Truncated,
-    #[cfg(not(all(feature = "proto-ipv4", feature = "proto-ipv6")))]
-    UnsupportedAtyp,
-    AddrError,
-    DnsError(Option<String>),
-}
-
-impl std::error::Error for Error {}
-
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{:#?}", self)
-    }
-}
-
-impl From<std::str::Utf8Error> for Error {
-    fn from(_val: std::str::Utf8Error) -> Self {
-        Error::Malformed
-    }
-}
-
-impl From<smolsocket::Error> for Error {
-    fn from(_val: smolsocket::Error) -> Self {
-        Error::AddrError
-    }
-}
 
 // pub(crate) type OptionResult<T> = core::result::Result<Option<T>, Error>;
 pub(crate) type CrateResult<T> = core::result::Result<T, Error>;
@@ -75,6 +47,7 @@ mod field {
     pub const NMETHODS: usize = 1;
     /// method selection request
     pub const METHODS_START: usize = 2;
+
     /// method selection request
     pub fn methods(nmethods: u8) -> Field {
         2..2 + nmethods as usize
