@@ -43,7 +43,7 @@ dns = ["std", "trust-dns-client"]
 rt_tokio = ["futures", "tokio", "tokio-util"]
 std = ["smolsocket/std", "smoltcp/std"]
 "proto-ipv4" = ["smolsocket/proto-ipv4", "smoltcp/proto-ipv4"]
-"proto-ipv6" = ["smolsocket/proto-ipv6", "smoltcp/proto-ipv4"]
+"proto-ipv6" = ["smolsocket/proto-ipv6", "smoltcp/proto-ipv6"]
 default = [
     "dns",
     "rt_tokio",
