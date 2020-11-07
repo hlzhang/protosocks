@@ -289,7 +289,7 @@ impl Addr {
     /// nameserver e.g. 8.8.8.8:53
     #[cfg(feature = "dns")]
     pub fn resolve(&self, nameserver: &str) -> CrateResult<SocketAddr> {
-        super::resolve_addr(self, nameserver)
+        crate::dns::dns_resolve(self, nameserver)
     }
 }
 

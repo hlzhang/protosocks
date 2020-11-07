@@ -8,6 +8,10 @@ use core::fmt;
 
 use bytes::{Bytes, BytesMut};
 
+#[cfg(feature = "dns")]
+pub use dns::{dns_resolve, DnsResolver};
+#[cfg(all(feature = "dns", feature = "rt_tokio"))]
+pub use dns::{async_dns_resolve, AsyncDnsResolver};
 pub use protocol::{
     Atyp, AuthReplyPacket,
     AuthReplyRepr, Cmd, CmdPacket, CmdRepr, Decoder as ProtocolDecoder, Encoder as ProtocolEncoder,
@@ -15,11 +19,9 @@ pub use protocol::{
     Rep, RepPacket, RepRepr, Rfc1929Ver, SocksAddr, Status, UdpFrag,
     UdpFragAssembler, UdpPacket, UdpRepr, UserPassPacket, UserPassRepr, Ver,
 };
-#[cfg(all(feature = "dns", feature = "rt_tokio"))]
-pub use protocol::{AsyncDnsResolver, resolve_domain_async};
-#[cfg(feature = "dns")]
-pub use protocol::DnsResolver;
 
+#[cfg(feature = "dns")]
+mod dns;
 pub(crate) mod protocol;
 
 pub(crate) mod field {
@@ -54,6 +56,9 @@ impl From<smolsocket::Error> for Error {
         Error::Malformed
     }
 }
+
+// pub(crate) type CrateOption<T> = core::result::Result<Option<T>, Error>;
+pub(crate) type CrateResult<T> = core::result::Result<T, Error>;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum Reply {
