@@ -8,10 +8,6 @@ use core::fmt;
 
 use bytes::{Bytes, BytesMut};
 
-#[cfg(feature = "dns")]
-pub use dns::{dns_resolve, DnsResolver};
-#[cfg(all(feature = "dns", feature = "rt_tokio"))]
-pub use dns::{async_dns_resolve, AsyncDnsResolver};
 pub use protocol::{
     Atyp, AuthReplyPacket,
     AuthReplyRepr, Cmd, CmdPacket, CmdRepr, Decoder as ProtocolDecoder, Encoder as ProtocolEncoder,
@@ -20,8 +16,6 @@ pub use protocol::{
     UdpFragAssembler, UdpPacket, UdpRepr, UserPassPacket, UserPassRepr, Ver,
 };
 
-#[cfg(feature = "dns")]
-mod dns;
 pub(crate) mod protocol;
 
 pub(crate) mod field {
