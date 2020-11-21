@@ -26,7 +26,7 @@ serde = "1.0"
 serde_derive = "1.0"
 #smolsocket = { version = "0.3", default-features = false }
 smolsocket = { path = "../smolsocket", default-features = false }
-smoltcp = { git = "https://github.com/smoltcp-rs/smoltcp", branch = "master", default-features = false }
+smoltcp = { path = "../smoltcp", branch = "master", default-features = false }
 snafu = "0.4.1"
 
 [dev-dependencies]
