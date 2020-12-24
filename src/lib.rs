@@ -27,8 +27,6 @@ pub(crate) mod field {
 pub enum Error {
     Malformed,
     Truncated,
-    #[cfg(feature = "dns")]
-    DnsError(Option<String>),
 }
 
 impl std::error::Error for Error {}
@@ -48,6 +46,15 @@ impl From<std::str::Utf8Error> for Error {
 impl From<smolsocket::Error> for Error {
     fn from(_val: smolsocket::Error) -> Self {
         Error::Malformed
+    }
+}
+
+impl From<Error> for ::std::io::Error {
+    fn from(val: Error) -> Self {
+        match val {
+            Error::Malformed => ::std::io::Error::new(::std::io::ErrorKind::InvalidData, val),
+            Error::Truncated => ::std::io::Error::new(::std::io::ErrorKind::UnexpectedEof, val),
+        }
     }
 }
 
