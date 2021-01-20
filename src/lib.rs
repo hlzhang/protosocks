@@ -259,7 +259,7 @@ mod tests {
 
     use smolsocket::SocketAddr;
 
-    use crate::{AuthReplyRepr, CmdRepr, MethodRepr, MethodsRepr, protocol::{Decoder, Encodable, Method}, RepRepr, SocksAddr, Status, UserPassRepr};
+    use crate::{AuthReplyRepr, CmdRepr, Error, MethodRepr, MethodsRepr, protocol::{Decoder, Encodable, Method}, RepRepr, SocksAddr, Status, UserPassRepr};
 
     lazy_static! {
         static ref INITIATED: Arc<Mutex<bool>> = Arc::new(Mutex::new(false));
@@ -318,5 +318,23 @@ mod tests {
         debug!("double:            {:?}", double);
         assert_eq!(T::decode(&mut double), Ok(Some(msg.clone())));
         assert_eq!(T::decode(&mut double), Ok(Some(msg.clone())));
+    }
+
+    #[test]
+    fn test_err_malformed() {
+        init_logger();
+
+        let io_err: ::std::io::Error = Error::Malformed.into();
+        assert_eq!(io_err.kind(), ::std::io::ErrorKind::InvalidData);
+        assert_eq!(io_err.to_string(), "Malformed".to_string());
+    }
+
+    #[test]
+    fn test_err_truncated() {
+        init_logger();
+
+        let io_err: ::std::io::Error = Error::Truncated.into();
+        assert_eq!(io_err.kind(), ::std::io::ErrorKind::UnexpectedEof);
+        assert_eq!(io_err.to_string(), "Truncated".to_string());
     }
 }
